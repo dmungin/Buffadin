@@ -27,8 +27,16 @@ function Buffadin.Roster:CanEditAssignments()
         return true
     end
 
-    -- In a raid without Free Assign: require Raid Leader or Raid Assistant
+    -- In a raid without Free Assign: allow Raid Leader or Raid Assistant
     if UnitIsGroupLeader("player") or UnitIsGroupAssistant("player") then
+        return true
+    end
+
+    -- Tanks (Main Tank / Off Tank or Tank role) are also permitted to configure assignments
+    if UnitGroupRolesAssigned and UnitGroupRolesAssigned("player") == "TANK" then
+        return true
+    end
+    if GetPartyAssignment and GetPartyAssignment("MAINTANK", "player") == true then
         return true
     end
 

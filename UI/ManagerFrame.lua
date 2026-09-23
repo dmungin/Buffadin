@@ -316,6 +316,8 @@ function Frame:UpdateGrid()
             self.permText:SetText("|cff00ff00Party Mode|r")
         elseif Buffadin.db.profile.freeAssign then
             self.permText:SetText("|cff00ff00Free Assign Active|r")
+        elseif not (UnitIsGroupLeader("player") or UnitIsGroupAssistant("player")) then
+            self.permText:SetText("|cff00ccffTank Access|r")
         else
             self.permText:SetText("|cff00ccffLeader/Assist Mode|r")
         end
