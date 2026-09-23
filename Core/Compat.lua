@@ -89,28 +89,38 @@ function Buffadin:IsSpellKnown(spellID)
 end
 
 -- =========================================================================
--- Unit Aura Compatibility Layer
+-- Unit Aura Compatibility Layer (Safe pcall & issecretvalue protection)
 -- =========================================================================
 
 function Buffadin:GetUnitBuffs(unit)
     local buffs = {}
     if not unit or not UnitExists(unit) then return buffs end
 
+    local isSecret = function(v)
+        return issecretvalue and issecretvalue(v)
+    end
+
     -- Modern WoW 10.0+ / 11.0+ / 1.60 C_UnitAuras API
     if C_UnitAuras and C_UnitAuras.GetAuraDataByIndex then
         local index = 1
         while true do
-            local aura = C_UnitAuras.GetAuraDataByIndex(unit, index, "HELPFUL")
-            if not aura then break end
-            table.insert(buffs, {
-                name = aura.name,
-                icon = aura.icon,
-                count = aura.applications or 1,
-                duration = aura.duration or 0,
-                expirationTime = aura.expirationTime or 0,
-                spellId = aura.spellId,
-                sourceUnit = aura.sourceUnit,
-            })
+            local ok, aura = pcall(C_UnitAuras.GetAuraDataByIndex, unit, index, "HELPFUL")
+            if not ok or not aura or isSecret(aura) then break end
+
+            local sId = aura.spellId
+            local expTime = aura.expirationTime
+            local dur = aura.duration
+            if not isSecret(sId) and not isSecret(expTime) then
+                table.insert(buffs, {
+                    name = aura.name,
+                    icon = aura.icon,
+                    count = aura.applications or 1,
+                    duration = dur or 0,
+                    expirationTime = expTime or 0,
+                    spellId = sId,
+                    sourceUnit = aura.sourceUnit,
+                })
+            end
             index = index + 1
         end
         return buffs
@@ -119,23 +129,25 @@ function Buffadin:GetUnitBuffs(unit)
     -- Legacy UnitBuff / UnitAura API
     local index = 1
     while true do
-        local name, icon, count, debuffType, duration, expirationTime, unitCaster, isStealable, nameplateShowPersonal, spellId
+        local ok, name, icon, count, debuffType, duration, expirationTime, unitCaster, isStealable, nameplateShowPersonal, spellId
         if UnitAura then
-            name, icon, count, debuffType, duration, expirationTime, unitCaster, isStealable, nameplateShowPersonal, spellId = UnitAura(unit, index, "HELPFUL")
+            ok, name, icon, count, debuffType, duration, expirationTime, unitCaster, isStealable, nameplateShowPersonal, spellId = pcall(UnitAura, unit, index, "HELPFUL")
         elseif UnitBuff then
-            name, icon, count, debuffType, duration, expirationTime, unitCaster, isStealable, nameplateShowPersonal, spellId = UnitBuff(unit, index)
+            ok, name, icon, count, debuffType, duration, expirationTime, unitCaster, isStealable, nameplateShowPersonal, spellId = pcall(UnitBuff, unit, index)
         end
-        if not name then break end
+        if not ok or not name or isSecret(name) then break end
 
-        table.insert(buffs, {
-            name = name,
-            icon = icon,
-            count = count or 1,
-            duration = duration or 0,
-            expirationTime = expirationTime or 0,
-            spellId = spellId or 0,
-            sourceUnit = unitCaster,
-        })
+        if not isSecret(spellId) and not isSecret(expirationTime) then
+            table.insert(buffs, {
+                name = name,
+                icon = icon,
+                count = count or 1,
+                duration = duration or 0,
+                expirationTime = expirationTime or 0,
+                spellId = spellId or 0,
+                sourceUnit = unitCaster,
+            })
+        end
         index = index + 1
     end
 
