@@ -376,16 +376,24 @@ function Bar:RefreshDisplay()
                 local leftSpellName = (gKnown and gSpellName ~= "") and gSpellName or nSpellName
                 local rightSpellName = nSpellName
 
-                -- Find best target unit for this class (prioritize unbuffed member without override)
+                -- Find best target unit for this class (prioritize unbuffed, in-range member without override)
                 local targetUnit = nil
                 local classUnits = Buffadin.Roster.classes[cls.id] or {}
+                local inRangeUnbuffed = nil
+                local anyUnbuffed = nil
+
                 for _, u in ipairs(classUnits) do
                     local uStatus = Buffadin.BuffScanner.unitStatus[u.unitId]
                     if uStatus and not uStatus.hasBuff and not uStatus.isSpecial and not u.isDead and u.isOnline and u.isVisible then
-                        targetUnit = u.unitId
-                        break
+                        if not anyUnbuffed then anyUnbuffed = u.unitId end
+                        if Buffadin:IsUnitInRange(u.unitId, gConfig and gConfig.spellId, leftSpellName) then
+                            inRangeUnbuffed = u.unitId
+                            break
+                        end
                     end
                 end
+                targetUnit = inRangeUnbuffed or anyUnbuffed
+
                 if not targetUnit then
                     for _, u in ipairs(classUnits) do
                         local uStatus = Buffadin.BuffScanner.unitStatus[u.unitId]

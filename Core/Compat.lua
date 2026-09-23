@@ -89,6 +89,45 @@ function Buffadin:IsSpellKnown(spellID)
 end
 
 -- =========================================================================
+-- Range Checking (Prioritizes nearby targets; defaults to true so it never blocks)
+-- =========================================================================
+
+function Buffadin:IsUnitInRange(unit, spellID, spellName)
+    if not unit or not UnitExists(unit) or not UnitIsConnected(unit) or UnitIsDeadOrGhost(unit) then
+        return false
+    end
+    if UnitIsUnit(unit, "player") then
+        return true
+    end
+
+    -- Modern Dragonflight / The War Within C_Spell API
+    if spellID and C_Spell and C_Spell.IsSpellInRange then
+        local ok, inRange = pcall(C_Spell.IsSpellInRange, spellID, unit)
+        if ok and inRange ~= nil then
+            return (inRange == true or inRange == 1)
+        end
+    end
+
+    -- Legacy IsSpellInRange
+    if spellName and _G.IsSpellInRange then
+        local ok, inRange = pcall(_G.IsSpellInRange, spellName, unit)
+        if ok and inRange ~= nil then
+            return (inRange == true or inRange == 1)
+        end
+    end
+
+    -- Standard 40y range check fallback
+    if UnitInRange then
+        local ok, inRange = pcall(UnitInRange, unit)
+        if ok and inRange ~= nil then
+            return (inRange == true or inRange == 1)
+        end
+    end
+
+    return true -- Default to true if range APIs are uncertain so buffing is never blocked
+end
+
+-- =========================================================================
 -- Unit Aura Compatibility Layer (Safe pcall & issecretvalue protection)
 -- =========================================================================
 

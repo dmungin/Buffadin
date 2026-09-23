@@ -209,15 +209,26 @@ function Buffadin.BuffScanner:GetNextAutoBuff()
         local classNeed = statusInfo.classMissingCount or statusInfo.missingCount
         if statusInfo.assignedGSpell > 0 and classNeed > 0 then
             if classNeed > maxMissing then
-                -- Find first reachable/visible alive unit of this class missing the buff (prefer non-special)
+                -- Find first reachable/visible alive unit of this class missing the buff (prefer in-range, then any unbuffed)
+                local inRangeUnit = nil
+                local fallbackUnit = nil
+                local gCfg = Buffadin.GREATER_BLESSINGS[statusInfo.assignedGSpell]
+                local sId = gCfg and gCfg.spellId or 0
                 for _, u in ipairs(Buffadin.Roster.classes[classId]) do
                     local uStatus = self.unitStatus[u.unitId]
                     if uStatus and not uStatus.hasBuff and not uStatus.isSpecial and not u.isDead and u.isOnline and u.isVisible then
-                        maxMissing = classNeed
-                        bestClassId = classId
-                        targetUnit = u.unitId
-                        break
+                        if not fallbackUnit then fallbackUnit = u.unitId end
+                        if Buffadin:IsUnitInRange(u.unitId, sId) then
+                            inRangeUnit = u.unitId
+                            break
+                        end
                     end
+                end
+                local chosen = inRangeUnit or fallbackUnit
+                if chosen then
+                    maxMissing = classNeed
+                    bestClassId = classId
+                    targetUnit = chosen
                 end
             end
         end
@@ -263,13 +274,24 @@ function Buffadin.BuffScanner:GetNextAutoBuff()
 
     for classId, statusInfo in pairs(self.classStatus) do
         if statusInfo.assignedGSpell > 0 and statusInfo.minExpiration > 0 and statusInfo.minExpiration < lowestTime then
+            local inRangeTarget = nil
+            local fallbackTarget = nil
+            local gCfg = Buffadin.GREATER_BLESSINGS[statusInfo.assignedGSpell]
+            local sId = gCfg and gCfg.spellId or 0
             for _, u in ipairs(Buffadin.Roster.classes[classId]) do
                 if not u.isDead and u.isOnline and u.isVisible then
-                    lowestTime = statusInfo.minExpiration
-                    expiringClassId = classId
-                    expiringTarget = u.unitId
-                    break
+                    if not fallbackTarget then fallbackTarget = u.unitId end
+                    if Buffadin:IsUnitInRange(u.unitId, sId) then
+                        inRangeTarget = u.unitId
+                        break
+                    end
                 end
+            end
+            local chosen = inRangeTarget or fallbackTarget
+            if chosen then
+                lowestTime = statusInfo.minExpiration
+                expiringClassId = classId
+                expiringTarget = chosen
             end
         end
     end
