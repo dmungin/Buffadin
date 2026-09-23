@@ -1,0 +1,18 @@
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor & IDE
+.vscode/
+.idea/
+*.swp
+*~
+
+# Backups and temp
+*.bak
+*.tmp
+
+# WoW client folders (if tested in-place)
+WTF/
+Logs/
+Errors/
