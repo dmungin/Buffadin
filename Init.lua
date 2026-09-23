@@ -42,6 +42,24 @@ SlashCmdList["BUFFADIN"] = function(msg)
         Buffadin.Assignments:AutoAssign()
     elseif msg == "clear" then
         Buffadin.Assignments:ClearAll()
+    elseif msg == "mock" or msg == "test" or msg:find("^mock ") or msg:find("^test ") then
+        if Buffadin.MockHarness then
+            local _, arg = strsplit(" ", msg, 2)
+            arg = arg and string.lower(string.trim(arg)) or ""
+            if arg == "party" or arg == "5" then
+                Buffadin.MockHarness:SetPreset("PARTY")
+            elseif arg == "raid" or arg == "40" or arg == "raid40" then
+                Buffadin.MockHarness:SetPreset("RAID40")
+            elseif arg == "raid25" or arg == "25" then
+                Buffadin.MockHarness:SetPreset("RAID25")
+            elseif arg == "off" or arg == "stop" or arg == "live" then
+                Buffadin.MockHarness:Disable()
+            else
+                Buffadin.MockHarness:TogglePanel()
+            end
+        else
+            Buffadin:Print("Mock Test Harness is not loaded in this build.")
+        end
     else
         Buffadin:Print("Commands:")
         print("  |cff00ff00/buffadin|r (or |cff00ff00/bf|r) - Toggle Blessing Manager window")
@@ -51,6 +69,7 @@ SlashCmdList["BUFFADIN"] = function(msg)
         print("  |cff00ff00/buffadin clear|r - Clear all assignments")
         print("  |cff00ff00/buffadin report|r - Broadcast blessings to chat")
         print("  |cff00ff00/buffadin reset|r - Reset bar position to center")
+        print("  |cff00ff00/buffadin mock|r - Open In-Game Mock Test Harness")
     end
 end
 

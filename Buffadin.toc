@@ -17,4 +17,7 @@ UI\PlayerPopups.lua
 UI\ManagerFrame.lua
 UI\OptionsFrame.lua
 UI\MinimapButton.lua
+#@debug@
+Dev\MockHarness.lua
+#@end-debug@
 Init.lua

@@ -1,0 +1,6 @@
+# Ignore takes place before folder moving takes place
+ignore:
+  - Dev
+  - .gitattributes
+  - .gitignore
+  - .github
