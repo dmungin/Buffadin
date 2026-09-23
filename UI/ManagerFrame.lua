@@ -139,6 +139,22 @@ function Frame:GetOrCreateCell(pallyIdx, classId)
         Buffadin.Assignments:CycleGreater(pallyName, cid, step)
     end)
 
+    btn:EnableMouseWheel(true)
+    btn:SetScript("OnMouseWheel", function(self, delta)
+        local canEdit = Buffadin.Roster:CanEditAssignments()
+        if not canEdit then
+            Buffadin:Print("Only the Raid Leader, Raid Assistant, or Tanks can change assignments.")
+            return
+        end
+
+        local pallyName = self.pallyName
+        local cid = self.classId
+        if not pallyName or not cid then return end
+
+        local step = (delta > 0) and 1 or -1
+        Buffadin.Assignments:CycleGreater(pallyName, cid, step)
+    end)
+
     btn:SetScript("OnEnter", function(self)
         local pallyName = self.pallyName
         local cid = self.classId
@@ -154,11 +170,11 @@ function Frame:GetOrCreateCell(pallyIdx, classId)
 
         if not Buffadin.Roster:CanEditAssignments() then
             GameTooltip:AddLine(" ")
-            GameTooltip:AddLine("|cffff4444[Locked]|r Only Raid Leader/Assist can edit.", 1, 0.3, 0.3)
+            GameTooltip:AddLine("|cffff4444[Locked]|r Only Raid Leader/Assist/Tanks can edit.", 1, 0.3, 0.3)
         else
             GameTooltip:AddLine(" ")
-            GameTooltip:AddLine("|cff00ff00Left-Click:|r Next Blessing", 0.7, 0.7, 0.7)
-            GameTooltip:AddLine("|cff00ff00Right-Click:|r Previous Blessing", 0.7, 0.7, 0.7)
+            GameTooltip:AddLine("|cff00ff00Left-Click / Scroll Up:|r Next Blessing", 0.7, 0.7, 0.7)
+            GameTooltip:AddLine("|cff00ff00Right-Click / Scroll Down:|r Previous Blessing", 0.7, 0.7, 0.7)
         end
         GameTooltip:Show()
     end)
@@ -199,6 +215,21 @@ function Frame:GetOrCreateAuraCell(pallyIdx)
         Buffadin.Assignments:CycleAura(pallyName, step)
     end)
 
+    btn:EnableMouseWheel(true)
+    btn:SetScript("OnMouseWheel", function(self, delta)
+        local canEdit = Buffadin.Roster:CanEditAssignments()
+        if not canEdit then
+            Buffadin:Print("Only the Raid Leader, Raid Assistant, or Tanks can change assignments.")
+            return
+        end
+
+        local pallyName = self.pallyName
+        if not pallyName then return end
+
+        local step = (delta > 0) and 1 or -1
+        Buffadin.Assignments:CycleAura(pallyName, step)
+    end)
+
     btn:SetScript("OnEnter", function(self)
         local pallyName = self.pallyName
         if not pallyName then return end
@@ -212,11 +243,11 @@ function Frame:GetOrCreateAuraCell(pallyIdx)
 
         if not Buffadin.Roster:CanEditAssignments() then
             GameTooltip:AddLine(" ")
-            GameTooltip:AddLine("|cffff4444[Locked]|r Only Raid Leader/Assist can edit.", 1, 0.3, 0.3)
+            GameTooltip:AddLine("|cffff4444[Locked]|r Only Raid Leader/Assist/Tanks can edit.", 1, 0.3, 0.3)
         else
             GameTooltip:AddLine(" ")
-            GameTooltip:AddLine("|cff00ff00Left-Click:|r Next Aura", 0.7, 0.7, 0.7)
-            GameTooltip:AddLine("|cff00ff00Right-Click:|r Previous Aura", 0.7, 0.7, 0.7)
+            GameTooltip:AddLine("|cff00ff00Left-Click / Scroll Up:|r Next Aura", 0.7, 0.7, 0.7)
+            GameTooltip:AddLine("|cff00ff00Right-Click / Scroll Down:|r Previous Aura", 0.7, 0.7, 0.7)
         end
         GameTooltip:Show()
     end)
@@ -612,6 +643,16 @@ function Frame:UpdateOverridesDrawer()
                 Frame:UpdateOverridesDrawer()
             end)
 
+            cell:EnableMouseWheel(true)
+            cell:SetScript("OnMouseWheel", function(self, delta)
+                if not self.unitName or not self.classId then return end
+                local canEdit = Buffadin.Roster:CanEditAssignments()
+                if not canEdit then return end
+                local step = (delta > 0) and 1 or -1
+                Buffadin.Assignments:CycleNormal(pallyName, self.classId, self.unitName, step)
+                Frame:UpdateOverridesDrawer()
+            end)
+
             cell:SetScript("OnEnter", function(self)
                 if not self.unitName or not self.classId then return end
                 local nIndex = Buffadin.Assignments:GetNormal(pallyName, self.classId, self.unitName)
@@ -630,8 +671,8 @@ function Frame:UpdateOverridesDrawer()
                     GameTooltip:AddLine("|cffffaa00[Tank]:|r Override to Might/Sanctuary to avoid Salvation!", 1, 0.8, 0)
                 end
                 GameTooltip:AddLine(" ")
-                GameTooltip:AddLine("|cff00ff00Left-Click:|r Next Override", 0.7, 0.7, 0.7)
-                GameTooltip:AddLine("|cff00ff00Right-Click:|r Previous Override", 0.7, 0.7, 0.7)
+                GameTooltip:AddLine("|cff00ff00Left-Click / Scroll Up:|r Next Override", 0.7, 0.7, 0.7)
+                GameTooltip:AddLine("|cff00ff00Right-Click / Scroll Down:|r Previous Override", 0.7, 0.7, 0.7)
                 GameTooltip:AddLine("|cff00ff00Shift-Click:|r Reset to Default", 0.7, 0.7, 0.7)
                 GameTooltip:Show()
             end)

@@ -82,6 +82,17 @@ function Popups:GetOrCreateButton(index)
         end
     end)
 
+    overrideBtn:EnableMouseWheel(true)
+    overrideBtn:SetScript("OnMouseWheel", function(self, delta)
+        if not self.unitName or not self.classId then return end
+        local pallyName = UnitName("player")
+        local step = (delta > 0) and 1 or -1
+        Buffadin.Assignments:CycleNormal(pallyName, self.classId, self.unitName, step)
+        if Popups.currentClassId and Popups.currentAnchor then
+            Popups:ShowForClass(Popups.currentClassId, Popups.currentAnchor)
+        end
+    end)
+
     overrideBtn:SetScript("OnEnter", function(self)
         Popups:CancelHide()
         if not self.unitName or not self.classId then return end
@@ -102,8 +113,8 @@ function Popups:GetOrCreateButton(index)
             GameTooltip:AddLine("|cffffaa00[Tank]:|r Override to Might/Sanctuary to avoid Salvation!", 1, 0.8, 0)
         end
         GameTooltip:AddLine(" ")
-        GameTooltip:AddLine("|cff00ff00Left-Click:|r Cycle Next Override", 0.7, 0.7, 0.7)
-        GameTooltip:AddLine("|cff00ff00Right-Click:|r Cycle Previous Override", 0.7, 0.7, 0.7)
+        GameTooltip:AddLine("|cff00ff00Left-Click / Scroll Up:|r Cycle Next Override", 0.7, 0.7, 0.7)
+        GameTooltip:AddLine("|cff00ff00Right-Click / Scroll Down:|r Cycle Previous Override", 0.7, 0.7, 0.7)
         GameTooltip:AddLine("|cff00ff00Shift-Click:|r Reset to Default Class Blessing", 0.7, 0.7, 0.7)
         GameTooltip:Show()
     end)
