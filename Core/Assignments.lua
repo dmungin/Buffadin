@@ -344,9 +344,9 @@ end
 
 function Buffadin.Assignments:Report(channel)
     channel = channel or (Buffadin.db and Buffadin.db.profile and Buffadin.db.profile.reportChannel) or "RAID"
-    if not IsInGroup() and not IsInRaid() then
+    if not Buffadin:IsInGroup() and not Buffadin:IsInRaid() then
         channel = "SAY"
-    elseif not IsInRaid() and channel == "RAID" then
+    elseif not Buffadin:IsInRaid() and channel == "RAID" then
         channel = "PARTY"
     end
 

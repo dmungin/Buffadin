@@ -17,8 +17,12 @@ end
 -- Permission Check
 -- =========================================================================
 function Buffadin.Roster:CanEditAssignments()
+    if Buffadin.MockHarness and Buffadin.MockHarness.active then
+        return true
+    end
+
     -- Solo or in a 5-man party: always allow free assignment
-    if not IsInRaid() then
+    if not Buffadin:IsInRaid() then
         return true
     end
 
@@ -58,69 +62,43 @@ function Buffadin.Roster:Update()
         self.classes[cls.id] = {}
     end
 
-    local unitList = {}
-    if IsInRaid() then
-        local count = GetNumGroupMembers()
-        for i = 1, count do
-            table.insert(unitList, "raid" .. i)
-        end
-    elseif IsInGroup() then
-        table.insert(unitList, "player")
-        local count = GetNumGroupMembers()
-        for i = 1, count - 1 do
-            table.insert(unitList, "party" .. i)
-        end
-    else
-        table.insert(unitList, "player")
-    end
+    local unitList = Buffadin:GetGroupMembers()
 
     for _, unit in ipairs(unitList) do
-        if UnitExists(unit) then
-            local name, realm = UnitName(unit)
-            if name and name ~= "" then
-                local fullName = realm and (realm ~= "") and (name .. "-" .. realm) or name
-                local _, classToken, classId = UnitClass(unit)
-                local clsConfig = Buffadin.CLASS_BY_TOKEN[classToken]
-                local cid = clsConfig and clsConfig.id or 1
+        local exists, name, fullName, classToken, isTank, isDead, isOnline, isVisible, isLeader, isAssist = Buffadin:GetUnitInfo(unit)
+        if exists and name and name ~= "" then
+            local clsConfig = Buffadin.CLASS_BY_TOKEN[classToken]
+            local cid = clsConfig and clsConfig.id or 1
 
-                -- Tank detection
-                local isTank = false
-                if UnitGroupRolesAssigned then
-                    isTank = (UnitGroupRolesAssigned(unit) == "TANK")
-                end
-                if not isTank and GetPartyAssignment then
-                    isTank = (GetPartyAssignment("MAINTANK", unit) == true)
-                end
+            local unitInfo = {
+                unitId = unit,
+                name = name,
+                fullName = fullName,
+                classToken = classToken,
+                classId = cid,
+                isTank = isTank,
+                isDead = isDead,
+                isOnline = isOnline,
+                isVisible = isVisible,
+            }
 
-                local unitInfo = {
+            self.units[unit] = unitInfo
+            table.insert(self.classes[cid], unitInfo)
+            self.totalCount = self.totalCount + 1
+
+            -- Track Paladins
+            if classToken == "PALADIN" then
+                self.paladinCount = self.paladinCount + 1
+                local isPlayer = Buffadin:IsUnitPlayer(unit)
+                local pallyKey = isPlayer and (UnitName("player") or name) or fullName
+                local pallyInfo = {
+                    name = pallyKey,
                     unitId = unit,
-                    name = name,
-                    fullName = fullName,
-                    classToken = classToken,
-                    classId = cid,
-                    isTank = isTank,
-                    isDead = UnitIsDeadOrGhost(unit),
-                    isOnline = UnitIsConnected(unit),
-                    isVisible = UnitIsVisible(unit),
+                    isPlayer = isPlayer,
+                    isLeader = isLeader,
+                    isAssist = isAssist,
+                    spells = {},
                 }
-
-                self.units[unit] = unitInfo
-                table.insert(self.classes[cid], unitInfo)
-                self.totalCount = self.totalCount + 1
-
-                -- Track Paladins
-                if classToken == "PALADIN" then
-                    self.paladinCount = self.paladinCount + 1
-                    local isPlayer = UnitIsUnit(unit, "player")
-                    local pallyKey = isPlayer and (UnitName("player") or name) or fullName
-                    local pallyInfo = {
-                        name = pallyKey,
-                        unitId = unit,
-                        isPlayer = isPlayer,
-                        isLeader = UnitIsGroupLeader(unit),
-                        isAssist = UnitIsGroupAssistant(unit),
-                        spells = {},
-                    }
 
                     -- Scan known spells for player Paladin
                     if pallyInfo.isPlayer then
@@ -175,7 +153,6 @@ function Buffadin.Roster:Update()
                 end
             end
         end
-    end
 
     -- Sort Paladins: local player first, then alphabetical
     local playerName = UnitName("player")

@@ -48,7 +48,26 @@ function Buffadin:GetSpellName(spellID)
     end
 
     local name = self:GetSpellInfo(spellID)
-    return name or ""
+    if name and name ~= "" then return name end
+
+    -- Fallback to predefined constants table if client API returns nil
+    for _, g in pairs(self.GREATER_BLESSINGS or {}) do
+        if g.spellId == spellID then return g.name end
+    end
+    for _, n in pairs(self.NORMAL_BLESSINGS or {}) do
+        if n.spellId == spellID then return n.name end
+    end
+    for _, a in pairs(self.AURAS or {}) do
+        if a.spellId == spellID then return a.name end
+    end
+    if self.RIGHTEOUS_FURY and self.RIGHTEOUS_FURY.spellId == spellID then
+        return self.RIGHTEOUS_FURY.name
+    end
+    for _, s in pairs(self.SEALS or {}) do
+        if s.spellId == spellID then return s.name end
+    end
+
+    return ""
 end
 
 function Buffadin:GetSpellTexture(spellID)
@@ -204,31 +223,9 @@ function Buffadin:GetUnitBuffs(unit)
 end
 
 function Buffadin:FindUnitBuff(unit, targetSpellID, targetSpellName)
-    -- Mock Harness override: return mock buff state if active
+    -- Mock Harness override: query simulated game world
     if Buffadin.MockHarness and Buffadin.MockHarness.active then
-        if unit == "player" then
-            if targetSpellID == Buffadin.RIGHTEOUS_FURY.spellId or targetSpellName == "Righteous Fury" then
-                return (Buffadin.MockHarness.hasRighteousFury == true), 0, 0
-            end
-            for _, a in pairs(Buffadin.AURAS) do
-                if (targetSpellID and a.spellId == targetSpellID) or (targetSpellName and a.name == targetSpellName) then
-                    return (Buffadin.MockHarness.hasAura ~= false), 0, 0
-                end
-            end
-        end
-        if Buffadin.MockHarness.buffStates then
-            local state = Buffadin.MockHarness.buffStates[unit]
-            if state and state.hasBuff then
-                local idMatch = (targetSpellID and targetSpellID > 0 and state.spellId == targetSpellID)
-                local nameMatch = (targetSpellName and targetSpellName ~= "" and state.spellName == targetSpellName)
-                if idMatch or nameMatch then
-                    return true, state.expires or 0, state.duration or 0
-                elseif not state.spellId and not state.spellName then
-                    return true, state.expires or 0, state.duration or 0
-                end
-            end
-            return false, 0, 0
-        end
+        return Buffadin.MockHarness:GetUnitAura(unit, targetSpellID, targetSpellName)
     end
 
     if not unit or not UnitExists(unit) then return false, 0, 0 end
@@ -289,6 +286,9 @@ end
 -- =========================================================================
 
 function Buffadin:InCombat()
+    if self.MockHarness and self.MockHarness.active then
+        return self.MockHarness.simulatedCombat == true
+    end
     return InCombatLockdown()
 end
 
@@ -327,3 +327,94 @@ function Buffadin:CreateBackdropFrame(frameType, name, parent, template)
     end
     return CreateFrame(frameType, name, parent, template)
 end
+
+-- =========================================================================
+-- Roster & Unit Query Compatibility Layer (Adapter Pattern)
+-- =========================================================================
+
+function Buffadin:GetGroupMembers()
+    if self.MockHarness and self.MockHarness.active then
+        return self.MockHarness:GetMockUnitList()
+    end
+
+    local unitList = {}
+    if IsInRaid() then
+        local count = GetNumGroupMembers()
+        for i = 1, count do
+            table.insert(unitList, "raid" .. i)
+        end
+    elseif IsInGroup() then
+        table.insert(unitList, "player")
+        local count = GetNumGroupMembers()
+        for i = 1, count - 1 do
+            table.insert(unitList, "party" .. i)
+        end
+    else
+        table.insert(unitList, "player")
+    end
+    return unitList
+end
+
+function Buffadin:UnitExists(unit)
+    if self.MockHarness and self.MockHarness.active then
+        return (self.MockHarness.mockUnits and self.MockHarness.mockUnits[unit] ~= nil) or unit == "player"
+    end
+    if not unit then return false end
+    return UnitExists(unit)
+end
+
+function Buffadin:GetUnitInfo(unit)
+    if self.MockHarness and self.MockHarness.active then
+        return self.MockHarness:GetMockUnitInfo(unit)
+    end
+
+    if not self:UnitExists(unit) then
+        return false
+    end
+
+    local name, realm = UnitName(unit)
+    if not name or name == "" then
+        return false
+    end
+
+    local fullName = realm and (realm ~= "") and (name .. "-" .. realm) or name
+    local _, classToken = UnitClass(unit)
+    local isTank = false
+    if UnitGroupRolesAssigned then
+        isTank = (UnitGroupRolesAssigned(unit) == "TANK")
+    end
+    if not isTank and GetPartyAssignment then
+        isTank = (GetPartyAssignment("MAINTANK", unit) == true)
+    end
+
+    local isDead = UnitIsDeadOrGhost(unit)
+    local isOnline = UnitIsConnected(unit)
+    local isVisible = UnitIsVisible(unit)
+    local isLeader = UnitIsGroupLeader(unit)
+    local isAssist = UnitIsGroupAssistant(unit)
+
+    return true, name, fullName, classToken, isTank, isDead, isOnline, isVisible, isLeader, isAssist
+end
+
+function Buffadin:IsUnitPlayer(unit)
+    if self.MockHarness and self.MockHarness.active then
+        return unit == "player" or (self.MockHarness.IsMockUnitPlayer and self.MockHarness:IsMockUnitPlayer(unit))
+    end
+    return UnitIsUnit(unit, "player")
+end
+
+function Buffadin:IsInRaid()
+    if self.MockHarness and self.MockHarness.active then
+        return self.MockHarness.currentPreset == "RAID25" or self.MockHarness.currentPreset == "RAID40"
+    end
+    return IsInRaid()
+end
+
+function Buffadin:IsInGroup()
+    if self.MockHarness and self.MockHarness.active then
+        return self.MockHarness.currentPreset ~= "SOLO"
+    end
+    return IsInGroup()
+end
+
+

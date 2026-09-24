@@ -49,7 +49,7 @@ function Buffadin.BuffScanner:Scan()
 
         for _, unitInfo in ipairs(units) do
             local unit = unitInfo.unitId
-            if UnitExists(unit) and not unitInfo.isDead and unitInfo.isOnline then
+            if Buffadin:UnitExists(unit) and not unitInfo.isDead and unitInfo.isOnline then
                 totalAlive = totalAlive + 1
 
                 -- Check if this specific unit has a Normal Blessing override assigned

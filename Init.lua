@@ -58,7 +58,12 @@ SlashCmdList["BUFFADIN"] = function(msg)
             elseif arg == "off" or arg == "stop" or arg == "live" then
                 Buffadin.MockHarness:Disable()
             else
-                Buffadin.MockHarness:TogglePanel()
+                if not Buffadin.MockHarness.active then
+                    Buffadin.MockHarness:Enable("RAID40")
+                    Buffadin.MockHarness:ShowPanel()
+                else
+                    Buffadin.MockHarness:TogglePanel()
+                end
             end
         else
             Buffadin:Print("Mock Test Harness is not loaded in this build.")

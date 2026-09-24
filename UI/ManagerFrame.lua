@@ -353,7 +353,7 @@ function Frame:UpdateGrid()
     -- Update permission status badge
     local canEdit = Buffadin.Roster:CanEditAssignments()
     if canEdit then
-        if not IsInRaid() then
+        if not Buffadin:IsInRaid() then
             self.permText:SetText("|cff00ff00Party Mode|r")
         elseif Buffadin.db.profile.freeAssign then
             self.permText:SetText("|cff00ff00Free Assign Active|r")

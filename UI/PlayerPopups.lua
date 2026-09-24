@@ -245,17 +245,15 @@ function Popups:ShowForClass(classId, anchorFrame)
         -- Configure Click Casting (Only out of combat)
         if not inCombat then
             local isMock = Buffadin.MockHarness and Buffadin.MockHarness.active
-            if isMock then
-                btn:SetAttribute("type1", nil)
+            local spellName = uStatus.assignedSpellName or ""
+            if spellName ~= "" and not unitInfo.isDead then
+                btn:SetAttribute("type1", isMock and nil or "spell")
+                btn:SetAttribute("spell1", spellName)
+                btn:SetAttribute("unit1", unitInfo.unitId)
             else
-                local spellName = uStatus.assignedSpellName or ""
-                if spellName ~= "" and not unitInfo.isDead then
-                    btn:SetAttribute("type1", "spell")
-                    btn:SetAttribute("spell1", spellName)
-                    btn:SetAttribute("unit1", unitInfo.unitId)
-                else
-                    btn:SetAttribute("type1", nil)
-                end
+                btn:SetAttribute("type1", nil)
+                btn:SetAttribute("spell1", nil)
+                btn:SetAttribute("unit1", nil)
             end
         end
 
