@@ -205,10 +205,29 @@ end
 
 function Buffadin:FindUnitBuff(unit, targetSpellID, targetSpellName)
     -- Mock Harness override: return mock buff state if active
-    if Buffadin.MockHarness and Buffadin.MockHarness.active and Buffadin.MockHarness.buffStates then
-        local state = Buffadin.MockHarness.buffStates[unit]
-        if state then
-            return state.hasBuff or false, state.expires or 0, state.duration or 0
+    if Buffadin.MockHarness and Buffadin.MockHarness.active then
+        if unit == "player" then
+            if targetSpellID == Buffadin.RIGHTEOUS_FURY.spellId or targetSpellName == "Righteous Fury" then
+                return (Buffadin.MockHarness.hasRighteousFury == true), 0, 0
+            end
+            for _, a in pairs(Buffadin.AURAS) do
+                if (targetSpellID and a.spellId == targetSpellID) or (targetSpellName and a.name == targetSpellName) then
+                    return (Buffadin.MockHarness.hasAura ~= false), 0, 0
+                end
+            end
+        end
+        if Buffadin.MockHarness.buffStates then
+            local state = Buffadin.MockHarness.buffStates[unit]
+            if state and state.hasBuff then
+                local idMatch = (targetSpellID and targetSpellID > 0 and state.spellId == targetSpellID)
+                local nameMatch = (targetSpellName and targetSpellName ~= "" and state.spellName == targetSpellName)
+                if idMatch or nameMatch then
+                    return true, state.expires or 0, state.duration or 0
+                elseif not state.spellId and not state.spellName then
+                    return true, state.expires or 0, state.duration or 0
+                end
+            end
+            return false, 0, 0
         end
     end
 

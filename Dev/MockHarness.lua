@@ -184,8 +184,26 @@ function Mock:InjectMockRoster(rosterData)
         table.insert(Buffadin.Roster.classes[u.classId], u)
 
         if not self.buffStates[u.unitId] then
+            local pName = UnitName("player") or "Player"
+            local nIndex = Buffadin.Assignments:GetNormal(pName, u.classId, u.name)
+            local gIndex = Buffadin.Assignments:GetGreater(pName, u.classId)
+            local sName = ""
+            local sId = 0
+            local isGreater = true
+            if nIndex and nIndex > 0 and Buffadin.NORMAL_BLESSINGS[nIndex] then
+                sName = Buffadin.NORMAL_BLESSINGS[nIndex].name
+                sId = Buffadin.NORMAL_BLESSINGS[nIndex].spellId
+                isGreater = false
+            elseif gIndex and gIndex > 0 and Buffadin.GREATER_BLESSINGS[gIndex] then
+                sName = Buffadin.GREATER_BLESSINGS[gIndex].name
+                sId = Buffadin.GREATER_BLESSINGS[gIndex].spellId
+                isGreater = true
+            end
             self.buffStates[u.unitId] = {
-                hasBuff = true,
+                hasBuff = (sName ~= ""),
+                spellId = sId,
+                spellName = sName,
+                isGreater = isGreater,
                 expires = now + 900,
                 duration = 900,
             }
@@ -215,9 +233,27 @@ end
 function Mock:InitializeBuffStates()
     self.buffStates = {}
     local now = GetTime()
+    local pName = UnitName("player") or "Player"
     for _, u in pairs(Buffadin.Roster.units) do
+        local nIndex = Buffadin.Assignments:GetNormal(pName, u.classId, u.name)
+        local gIndex = Buffadin.Assignments:GetGreater(pName, u.classId)
+        local sName = ""
+        local sId = 0
+        local isGreater = true
+        if nIndex and nIndex > 0 and Buffadin.NORMAL_BLESSINGS[nIndex] then
+            sName = Buffadin.NORMAL_BLESSINGS[nIndex].name
+            sId = Buffadin.NORMAL_BLESSINGS[nIndex].spellId
+            isGreater = false
+        elseif gIndex and gIndex > 0 and Buffadin.GREATER_BLESSINGS[gIndex] then
+            sName = Buffadin.GREATER_BLESSINGS[gIndex].name
+            sId = Buffadin.GREATER_BLESSINGS[gIndex].spellId
+            isGreater = true
+        end
         self.buffStates[u.unitId] = {
-            hasBuff = true,
+            hasBuff = (sName ~= ""),
+            spellId = sId,
+            spellName = sName,
+            isGreater = isGreater,
             expires = now + 900,
             duration = 900,
         }
@@ -232,7 +268,14 @@ function Mock:ScanMockBuffs()
 
     for classId, units in pairs(Buffadin.Roster.classes) do
         local gIndex = Buffadin.Assignments:GetGreater(playerName, classId)
+        local gCfg = Buffadin.GREATER_BLESSINGS[gIndex]
+        local gSpellName = gCfg and gCfg.name or ""
+        local gSpellId = gCfg and gCfg.spellId or 0
+
         local nEquivIndex = Buffadin.GREATER_TO_NORMAL[gIndex] or 0
+        local nEquivCfg = Buffadin.NORMAL_BLESSINGS[nEquivIndex]
+        local nEquivName = nEquivCfg and nEquivCfg.name or ""
+        local nEquivId = nEquivCfg and nEquivCfg.spellId or 0
 
         local totalAlive = 0
         local missingCount = 0
@@ -246,21 +289,52 @@ function Mock:ScanMockBuffs()
 
             local nIndex = Buffadin.Assignments:GetNormal(playerName, classId, unitInfo.name)
             local isSpecial = (nIndex and nIndex > 0)
-            local state = self.buffStates[unitInfo.unitId] or { hasBuff = true, expires = now + 900, duration = 900 }
+            local targetSpellName = ""
+            local targetSpellId = 0
 
-            local hasBuff = state.hasBuff
+            if isSpecial and Buffadin.NORMAL_BLESSINGS[nIndex] then
+                targetSpellName = Buffadin.NORMAL_BLESSINGS[nIndex].name
+                targetSpellId = Buffadin.NORMAL_BLESSINGS[nIndex].spellId or 0
+            elseif gIndex > 0 and gCfg then
+                targetSpellName = gSpellName
+                targetSpellId = gSpellId
+            end
+
+            local state = self.buffStates[unitInfo.unitId]
+            local hasBuff = false
             local remaining = 0
 
-            if hasBuff and state.expires and state.expires > now then
-                remaining = math.max(0, state.expires - now)
-                if remaining < minExpiration then
-                    minExpiration = remaining
+            if state and state.hasBuff then
+                local matches = false
+                if isSpecial then
+                    matches = (state.spellName == targetSpellName) or (targetSpellId > 0 and state.spellId == targetSpellId)
+                else
+                    matches = (state.spellName == gSpellName) or (state.spellName == nEquivName) or
+                              (gSpellId > 0 and state.spellId == gSpellId) or
+                              (nEquivId > 0 and state.spellId == nEquivId)
+                    if not state.spellName and not state.spellId then
+                        matches = true
+                    end
                 end
-            elseif hasBuff then
-                remaining = 900
-            else
-                hasBuff = false
-                remaining = 0
+
+                if matches then
+                    if state.expires and state.expires > now then
+                        remaining = math.max(0, state.expires - now)
+                        if remaining < minExpiration then
+                            minExpiration = remaining
+                        end
+                        hasBuff = true
+                    elseif state.expires and state.expires <= now then
+                        hasBuff = false
+                        remaining = 0
+                    else
+                        hasBuff = true
+                        remaining = 900
+                    end
+                else
+                    hasBuff = false
+                    remaining = 0
+                end
             end
 
             if not hasBuff then
@@ -273,19 +347,12 @@ function Mock:ScanMockBuffs()
                 end
             end
 
-            local assignedSpell = ""
-            if isSpecial and Buffadin.NORMAL_BLESSINGS[nIndex] then
-                assignedSpell = Buffadin.NORMAL_BLESSINGS[nIndex].name
-            elseif gIndex > 0 and Buffadin.GREATER_BLESSINGS[gIndex] then
-                assignedSpell = Buffadin.GREATER_BLESSINGS[gIndex].name
-            end
-
             Buffadin.BuffScanner.unitStatus[unitInfo.unitId] = {
                 hasBuff = hasBuff,
                 expiration = remaining,
                 assignedGSpellId = (gIndex > 0) and Buffadin.GREATER_BLESSINGS[gIndex].spellId or 0,
                 assignedNSpellId = isSpecial and Buffadin.NORMAL_BLESSINGS[nIndex].spellId or 0,
-                assignedSpellName = assignedSpell,
+                assignedSpellName = targetSpellName,
                 isSpecial = isSpecial,
             }
         end
@@ -481,20 +548,17 @@ function Mock:CastClassBlessing(classId, isGreater, category, customReason)
         local spellName = gConfig and gConfig.name or "Greater Blessing"
 
         local buffedPlayers = {}
-        local skippedOverrides = {}
 
         for _, u in ipairs(classUnits) do
-            local nIndex = Buffadin.Assignments:GetNormal(pName, classId, u.name)
-            if nIndex and nIndex > 0 then
-                table.insert(skippedOverrides, u.name)
-            else
-                self.buffStates[u.unitId] = {
-                    hasBuff = true,
-                    expires = now + 900,
-                    duration = 900,
-                }
-                table.insert(buffedPlayers, u.name)
-            end
+            self.buffStates[u.unitId] = {
+                hasBuff = true,
+                spellId = gConfig and gConfig.spellId or 0,
+                spellName = spellName,
+                isGreater = true,
+                expires = now + 900,
+                duration = 900,
+            }
+            table.insert(buffedPlayers, u.name)
         end
 
         local countStr = string.format("%d player%s", #buffedPlayers, #buffedPlayers == 1 and "" or "s")
@@ -502,48 +566,103 @@ function Mock:CastClassBlessing(classId, isGreater, category, customReason)
         if #buffedPlayers > 0 then
             details = details .. ": " .. table.concat(buffedPlayers, ", ")
         end
-        if #skippedOverrides > 0 then
-            details = details .. " (Skipped: " .. table.concat(skippedOverrides, ", ") .. " has override)"
-        end
         if customReason and customReason ~= "" then
             details = details .. " [" .. customReason .. "]"
         end
 
         self:LogEvent(category or "CLASS", spellName, clsName, details)
     else
-        -- Right-click: Normal Blessing on next unit
-        local nIndex = Buffadin.GREATER_TO_NORMAL[gIndex] or 1
-        local nConfig = Buffadin.NORMAL_BLESSINGS[nIndex]
-        local spellName = nConfig and nConfig.name or "Normal Blessing"
-
+        -- Right-click: Normal Blessing on next unit needing a buff (prioritize overrides, then missing class buffs)
         local targetUnit = nil
-        local lowestExp = 999999
+        local targetSpellName = nil
+        local targetSpellId = 0
+        local targetReason = "Single Normal Blessing"
 
+        -- 1. Check for unit with normal override that is missing that override
         for _, u in ipairs(classUnits) do
-            local state = self.buffStates[u.unitId]
-            if not state or not state.hasBuff then
-                targetUnit = u
-                break
-            elseif state.expires and state.expires < lowestExp then
-                lowestExp = state.expires
-                targetUnit = u
+            local nIndex = Buffadin.Assignments:GetNormal(pName, classId, u.name)
+            if nIndex and nIndex > 0 then
+                local nCfg = Buffadin.NORMAL_BLESSINGS[nIndex]
+                local state = self.buffStates[u.unitId]
+                if not state or not state.hasBuff or state.spellName ~= (nCfg and nCfg.name) then
+                    targetUnit = u
+                    targetSpellName = nCfg and nCfg.name
+                    targetSpellId = nCfg and nCfg.spellId or 0
+                    targetReason = u.isTank and "Tank Override Blessing" or "Player Override Blessing"
+                    break
+                end
             end
         end
 
+        -- 2. Check for unit missing standard class blessing
+        if not targetUnit then
+            local gConfig = Buffadin.GREATER_BLESSINGS[gIndex]
+            local gSpellName = gConfig and gConfig.name
+            local nEquiv = Buffadin.GREATER_TO_NORMAL[gIndex] or 1
+            local nEquivCfg = Buffadin.NORMAL_BLESSINGS[nEquiv]
+            local nEquivName = nEquivCfg and nEquivCfg.name
+
+            for _, u in ipairs(classUnits) do
+                local nIndex = Buffadin.Assignments:GetNormal(pName, classId, u.name)
+                if not (nIndex and nIndex > 0) then
+                    local state = self.buffStates[u.unitId]
+                    if not state or not state.hasBuff or (state.spellName ~= gSpellName and state.spellName ~= nEquivName) then
+                        targetUnit = u
+                        targetSpellName = nEquivName
+                        targetSpellId = nEquivCfg and nEquivCfg.spellId or 0
+                        targetReason = "Single Normal Blessing"
+                        break
+                    end
+                end
+            end
+        end
+
+        -- 3. Check for unit with lowest remaining expiration
+        if not targetUnit then
+            local lowestExp = 999999
+            for _, u in ipairs(classUnits) do
+                local state = self.buffStates[u.unitId]
+                if state and state.expires and state.expires < lowestExp then
+                    lowestExp = state.expires
+                    targetUnit = u
+                end
+            end
+        end
+
+        -- Fallback to first unit if none selected
         if not targetUnit and #classUnits > 0 then
             targetUnit = classUnits[1]
         end
 
         if targetUnit then
+            if not targetSpellName then
+                local nIndex = Buffadin.Assignments:GetNormal(pName, classId, targetUnit.name)
+                if nIndex and nIndex > 0 and Buffadin.NORMAL_BLESSINGS[nIndex] then
+                    targetSpellName = Buffadin.NORMAL_BLESSINGS[nIndex].name
+                    targetSpellId = Buffadin.NORMAL_BLESSINGS[nIndex].spellId
+                    targetReason = targetUnit.isTank and "Tank Override Blessing" or "Player Override Blessing"
+                else
+                    local nEquiv = Buffadin.GREATER_TO_NORMAL[gIndex] or 1
+                    local nEquivCfg = Buffadin.NORMAL_BLESSINGS[nEquiv]
+                    targetSpellName = nEquivCfg and nEquivCfg.name or "Normal Blessing"
+                    targetSpellId = nEquivCfg and nEquivCfg.spellId or 0
+                    targetReason = "Single Normal Blessing"
+                end
+            end
+
             self.buffStates[targetUnit.unitId] = {
                 hasBuff = true,
+                spellId = targetSpellId,
+                spellName = targetSpellName,
+                isGreater = false,
                 expires = now + 900,
                 duration = 900,
             }
+
             local targetDesc = targetUnit.name .. (targetUnit.isTank and " [Tank]" or "")
-            self:LogEvent(category or "NORMAL", spellName, targetDesc, customReason or "Single Normal Blessing")
+            self:LogEvent(category or "NORMAL", targetSpellName, targetDesc, customReason or targetReason)
         else
-            self:LogEvent("WARN", spellName, clsName, "No alive units found")
+            self:LogEvent("WARN", "Blessing", clsName, "No alive units found")
         end
     end
 
@@ -584,12 +703,6 @@ function Mock:CastAutoBuff(isGreater)
 
     -- 3. Single target unit (override, normal blessing, expiring)
     local now = GetTime()
-    self.buffStates[targetUnit] = {
-        hasBuff = true,
-        expires = now + 900,
-        duration = 900,
-    }
-
     local uInfo = Buffadin.Roster.units[targetUnit]
     local sId = (nSpellId and nSpellId > 0) and nSpellId or (gSpellId or 0)
     local sName = Buffadin:GetSpellName(sId)
@@ -598,7 +711,17 @@ function Mock:CastAutoBuff(isGreater)
         local nIndex = Buffadin.GREATER_TO_NORMAL[gIndex] or 1
         local nCfg = Buffadin.NORMAL_BLESSINGS[nIndex]
         sName = nCfg and nCfg.name or "Blessing"
+        sId = nCfg and nCfg.spellId or 0
     end
+
+    self.buffStates[targetUnit] = {
+        hasBuff = true,
+        spellId = sId,
+        spellName = sName,
+        isGreater = false,
+        expires = now + 900,
+        duration = 900,
+    }
 
     local targetDesc = (uInfo and uInfo.name or targetUnit) .. ((uInfo and uInfo.isTank) and " [Tank]" or "")
     self:LogEvent("AUTO", sName, targetDesc, reasonText or "Single Target Blessing")
@@ -618,21 +741,27 @@ function Mock:CastPlayerPopup(btn)
     local now = GetTime()
     local nIndex = Buffadin.Assignments:GetNormal(pName, u.classId, u.name)
     local spellName = ""
+    local spellId = 0
     local reason = ""
 
     if nIndex and nIndex > 0 and Buffadin.NORMAL_BLESSINGS[nIndex] then
         spellName = Buffadin.NORMAL_BLESSINGS[nIndex].name
+        spellId = Buffadin.NORMAL_BLESSINGS[nIndex].spellId or 0
         reason = u.isTank and "Tank Override Blessing" or "Player Override Blessing"
     else
         local gIndex = Buffadin.Assignments:GetGreater(pName, u.classId)
         local nEquiv = Buffadin.GREATER_TO_NORMAL[gIndex] or 1
         local nConfig = Buffadin.NORMAL_BLESSINGS[nEquiv]
         spellName = nConfig and nConfig.name or "Blessing"
+        spellId = nConfig and nConfig.spellId or 0
         reason = "Direct Player Blessing"
     end
 
     self.buffStates[u.unitId] = {
         hasBuff = true,
+        spellId = spellId,
+        spellName = spellName,
+        isGreater = false,
         expires = now + 900,
         duration = 900,
     }
@@ -853,10 +982,29 @@ end
 function Mock:BuffAll(duration)
     duration = duration or 900
     local now = GetTime()
+    local pName = UnitName("player") or "Player"
     local count = 0
     for _, u in pairs(Buffadin.Roster.units) do
+        local nIndex = Buffadin.Assignments:GetNormal(pName, u.classId, u.name)
+        local gIndex = Buffadin.Assignments:GetGreater(pName, u.classId)
+        local spellName = ""
+        local spellId = 0
+        local isGreater = true
+        if nIndex and nIndex > 0 and Buffadin.NORMAL_BLESSINGS[nIndex] then
+            spellName = Buffadin.NORMAL_BLESSINGS[nIndex].name
+            spellId = Buffadin.NORMAL_BLESSINGS[nIndex].spellId or 0
+            isGreater = false
+        elseif gIndex and gIndex > 0 and Buffadin.GREATER_BLESSINGS[gIndex] then
+            spellName = Buffadin.GREATER_BLESSINGS[gIndex].name
+            spellId = Buffadin.GREATER_BLESSINGS[gIndex].spellId or 0
+            isGreater = true
+        end
+
         self.buffStates[u.unitId] = {
             hasBuff = true,
+            spellId = spellId,
+            spellName = spellName,
+            isGreater = isGreater,
             expires = now + duration,
             duration = duration,
         }
@@ -875,6 +1023,8 @@ function Mock:SetRandomMissing()
         if u.classId == 1 or u.classId == 7 or math.random() > 0.65 then
             self.buffStates[u.unitId] = {
                 hasBuff = false,
+                spellId = 0,
+                spellName = "",
                 expires = 0,
                 duration = 0,
             }
@@ -893,16 +1043,27 @@ end
 
 function Mock:SetExpiring()
     local now = GetTime()
+    local pName = UnitName("player") or "Player"
     for _, u in pairs(Buffadin.Roster.units) do
         if u.classId == 4 then -- Rogues expiring in 45s
+            local gIndex = Buffadin.Assignments:GetGreater(pName, 4)
+            local gCfg = Buffadin.GREATER_BLESSINGS[gIndex]
             self.buffStates[u.unitId] = {
                 hasBuff = true,
+                spellId = gCfg and gCfg.spellId or 0,
+                spellName = gCfg and gCfg.name or "Greater Blessing",
+                isGreater = true,
                 expires = now + 45,
                 duration = 900,
             }
         elseif u.classId == 3 then -- Hunters expiring in 110s
+            local gIndex = Buffadin.Assignments:GetGreater(pName, 3)
+            local gCfg = Buffadin.GREATER_BLESSINGS[gIndex]
             self.buffStates[u.unitId] = {
                 hasBuff = true,
+                spellId = gCfg and gCfg.spellId or 0,
+                spellName = gCfg and gCfg.name or "Greater Blessing",
+                isGreater = true,
                 expires = now + 110,
                 duration = 900,
             }
