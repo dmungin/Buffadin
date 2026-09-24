@@ -255,9 +255,12 @@ Buffadin.EventFrame:SetScript("OnEvent", function(self, event, ...)
         Buffadin.BlessingsBar:UpdateLayout()
 
     elseif event == "PLAYER_REGEN_DISABLED" then
-        -- Entered combat: ensure popups are closed
+        -- Entered combat: ensure popups are closed and visually disable combat-restricted elements
         if Buffadin.PlayerPopups then
             Buffadin.PlayerPopups:Hide()
+        end
+        if Buffadin.BlessingsBar and Buffadin.BlessingsBar:IsShown() then
+            Buffadin.BlessingsBar:RefreshDisplay()
         end
 
     elseif event == "CHAT_MSG_ADDON" then
