@@ -20,9 +20,12 @@
 <img width="311" height="592" alt="image" src="https://github.com/user-attachments/assets/611a730f-2aa6-42d1-b3db-44c6cae60385" />
 <img width="814" height="498" alt="image" src="https://github.com/user-attachments/assets/18b9ff36-c2cc-4c70-9b5e-b2a63394ecc6" />
 
-**Smart Target & Auto-Buff Solver**
+**Smart Target & Auto-Buff Solver (Out of Combat)**
 
 <img width="423" height="279" alt="image" src="https://github.com/user-attachments/assets/b62d8511-b900-44b6-95a7-a72a7cd938e1" />
+
+- Priority-based one-click buffing button that dynamically calculates and targets the next player needing a blessing (missing self-aura, class with the most missing buffs, expiring buffs, or custom single-target overrides).
+- **Out of Combat Only**: Due to World of Warcraft's combat lockdown restrictions on secure action buttons, smart auto-targeting is strictly out of combat. During combat, the button is automatically disabled and greyed out to prevent mis-targeting. As soon as combat drops, the button immediately reactivates with the next optimal target.
 
 **Flexible Permission Control**
 - **Party & Solo**: Defaults to Free Assign mode so anyone can configure their own buffs without requiring party lead.
@@ -55,7 +58,7 @@ cd "World of Warcraft/_classic_beta_/Interface/AddOns"
 git clone https://github.com/<your-username>/buffadin.git Buffadin
 ```
 
-Ensure the folder is named `Buffadin` (or `buffadin`).
+Ensure the folder is named `Buffadin`.
 
 ---
 

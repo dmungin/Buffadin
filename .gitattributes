@@ -4,4 +4,3 @@
 /.gitignore export-ignore
 /pkgmeta.yaml export-ignore
 /.github export-ignore
-/buffadin.toc export-ignore

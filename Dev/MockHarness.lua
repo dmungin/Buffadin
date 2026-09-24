@@ -529,14 +529,19 @@ function Mock:HookInteractiveButtons()
     -- 2. Auto-Buff Button
     if Buffadin.BlessingsBar and Buffadin.BlessingsBar.autoButton then
         self:HookButton(Buffadin.BlessingsBar.autoButton, function(bSelf, button)
+            if Buffadin:InCombat() then return end
             if button == "LeftButton" then
                 local spell = bSelf:GetAttribute("spell1")
                 local unit = bSelf:GetAttribute("unit1")
-                Mock:PerformSimulatedCast(spell, unit, "AUTO")
+                if spell and unit then
+                    Mock:PerformSimulatedCast(spell, unit, "AUTO")
+                end
             elseif button == "RightButton" then
                 local spell = bSelf:GetAttribute("spell2")
                 local unit = bSelf:GetAttribute("unit2")
-                Mock:PerformSimulatedCast(spell, unit, "AUTO")
+                if spell and unit then
+                    Mock:PerformSimulatedCast(spell, unit, "AUTO")
+                end
             end
         end)
     end
@@ -743,6 +748,7 @@ function Mock:ToggleCombat()
         if Buffadin.db and Buffadin.db.profile.hideInCombat then
             Buffadin.BlessingsBar:Hide()
         end
+        Buffadin.BlessingsBar:RefreshDisplay()
     else
         self:LogEvent("INFO", "Combat State", "Out of Combat", "Simulated COMBAT END")
         Buffadin:Print("Mock: Simulated |cff00ff00COMBAT END|r (processing queued changes).")

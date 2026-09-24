@@ -103,10 +103,26 @@ end
 -- =========================================================================
 function Bar:CreateUtilityButtons()
     -- 1. Auto-Buff Button
-    local autoBtn = CreateFrame("Button", "Buffadin_AutoBuffBtn", self, "SecureActionButtonTemplate, BackdropTemplate")
+    local autoBtn = CreateFrame("Button", "Buffadin_AutoBuffBtn", self, "SecureActionButtonTemplate, SecureHandlerStateTemplate, BackdropTemplate")
     autoBtn:SetSize(40, 40)
     Buffadin.Theme:ApplyCardBackdrop(autoBtn, 0.90, 0.80)
     autoBtn:RegisterForClicks("AnyUp", "AnyDown")
+
+    -- Secure state driver: clear click attributes when entering combat
+    if RegisterStateDriver then
+        RegisterStateDriver(autoBtn, "combat", "[combat] in; out")
+        autoBtn:SetAttribute("_onstate-combat", [=[
+            if newstate == "in" then
+                self:SetAttribute("type", nil)
+                self:SetAttribute("type1", nil)
+                self:SetAttribute("type2", nil)
+                self:SetAttribute("spell1", nil)
+                self:SetAttribute("unit1", nil)
+                self:SetAttribute("spell2", nil)
+                self:SetAttribute("unit2", nil)
+            end
+        ]=])
+    end
 
     local autoIcon = autoBtn:CreateTexture(nil, "ARTWORK")
     autoIcon:SetSize(28, 28)
@@ -124,6 +140,13 @@ function Bar:CreateUtilityButtons()
         local anchor, xOff, yOff = Bar:GetTooltipAnchor(self, true)
         GameTooltip:SetOwner(self, anchor, xOff, yOff)
         GameTooltip:AddLine("Auto-Buff Next Priority", 0.95, 0.82, 0.3)
+
+        if Buffadin:InCombat() then
+            GameTooltip:AddLine("|cffff4444Disabled during combat|r", 1, 0.3, 0.3)
+            GameTooltip:AddLine("Smart auto-buff targeting is out of combat only due to game restrictions.", 0.7, 0.7, 0.7, true)
+            GameTooltip:Show()
+            return
+        end
 
         local targetUnit, gSpellId, nSpellId, isGreater, bestClassId, reasonText = Buffadin.BuffScanner:GetNextAutoBuff()
         if reasonText then
@@ -580,17 +603,36 @@ function Bar:RefreshDisplay()
     -- 2. Update Utility Buttons Visuals & Attributes
     -- Auto-Buff Button
     if self.autoButton and self.autoButton:IsShown() then
-        local targetUnit, gSpellId, nSpellId, isGreater, bestClassId, reasonText = Buffadin.BuffScanner:GetNextAutoBuff()
-        local activeSpellId = (gSpellId and gSpellId > 0) and gSpellId or (nSpellId or 0)
-
-        if activeSpellId > 0 and targetUnit then
-            local spellTex = Buffadin:GetSpellTexture(activeSpellId)
-            if spellTex and spellTex ~= "" then
-                self.autoButton.icon:SetTexture(spellTex)
+        if inCombat then
+            self.autoButton.icon:SetTexture("Interface\\Icons\\Spell_Holy_GreaterBlessingofKings")
+            self.autoButton.icon:SetDesaturated(true)
+            self.autoButton.icon:SetVertexColor(0.45, 0.45, 0.45)
+            Buffadin.Theme:SetBorderStatus(self.autoButton, "Disabled")
+            self.autoButton.count:SetText("")
+            local isMock = Buffadin.MockHarness and Buffadin.MockHarness.active
+            if isMock then
+                self.autoButton:SetAttribute("type", nil)
+                self.autoButton:SetAttribute("type1", nil)
+                self.autoButton:SetAttribute("type2", nil)
+                self.autoButton:SetAttribute("spell1", nil)
+                self.autoButton:SetAttribute("unit1", nil)
+                self.autoButton:SetAttribute("spell2", nil)
+                self.autoButton:SetAttribute("unit2", nil)
             end
-            Buffadin.Theme:SetBorderStatus(self.autoButton, "Some")
+        else
+            self.autoButton.icon:SetDesaturated(false)
+            self.autoButton.icon:SetVertexColor(1, 1, 1)
 
-            if not inCombat then
+            local targetUnit, gSpellId, nSpellId, isGreater, bestClassId, reasonText = Buffadin.BuffScanner:GetNextAutoBuff()
+            local activeSpellId = (gSpellId and gSpellId > 0) and gSpellId or (nSpellId or 0)
+
+            if activeSpellId > 0 and targetUnit then
+                local spellTex = Buffadin:GetSpellTexture(activeSpellId)
+                if spellTex and spellTex ~= "" then
+                    self.autoButton.icon:SetTexture(spellTex)
+                end
+                Buffadin.Theme:SetBorderStatus(self.autoButton, "Some")
+
                 local isMock = Buffadin.MockHarness and Buffadin.MockHarness.active
                 local gKnown = (gSpellId and gSpellId > 0) and Buffadin:IsSpellKnown(gSpellId)
                 local leftSpellName = (gKnown and gSpellId > 0) and Buffadin:GetSpellName(gSpellId) or ((nSpellId and nSpellId > 0) and Buffadin:GetSpellName(nSpellId) or "")
@@ -617,11 +659,9 @@ function Bar:RefreshDisplay()
                     self.autoButton:SetAttribute("spell2", nil)
                     self.autoButton:SetAttribute("unit2", nil)
                 end
-            end
-        else
-            self.autoButton.icon:SetTexture("Interface\\Icons\\Spell_Holy_GreaterBlessingofKings")
-            Buffadin.Theme:SetBorderStatus(self.autoButton, "Good")
-            if not inCombat then
+            else
+                self.autoButton.icon:SetTexture("Interface\\Icons\\Spell_Holy_GreaterBlessingofKings")
+                Buffadin.Theme:SetBorderStatus(self.autoButton, "Good")
                 self.autoButton:SetAttribute("type1", nil)
                 self.autoButton:SetAttribute("spell1", nil)
                 self.autoButton:SetAttribute("unit1", nil)

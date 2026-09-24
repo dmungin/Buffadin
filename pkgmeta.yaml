@@ -4,4 +4,3 @@ ignore:
   - .gitattributes
   - .gitignore
   - .github
-  - buffadin.toc
