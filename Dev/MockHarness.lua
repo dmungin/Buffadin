@@ -512,6 +512,7 @@ function Mock:HookInteractiveButtons()
     if Buffadin.BlessingsBar and Buffadin.BlessingsBar.buttons then
         for _, btn in pairs(Buffadin.BlessingsBar.buttons) do
             self:HookButton(btn, function(bSelf, button)
+                if IsShiftKeyDown and IsShiftKeyDown() then return end
                 if button == "LeftButton" then
                     local spell = bSelf:GetAttribute("spell1")
                     local unit = bSelf:GetAttribute("unit1")
@@ -543,6 +544,7 @@ function Mock:HookInteractiveButtons()
     -- 3. Aura Button
     if Buffadin.BlessingsBar and Buffadin.BlessingsBar.auraButton then
         self:HookButton(Buffadin.BlessingsBar.auraButton, function(bSelf, button)
+            if IsShiftKeyDown and IsShiftKeyDown() then return end
             local spell = bSelf:GetAttribute("spell")
             Mock:ToggleMockAura(spell)
         end)

@@ -93,45 +93,71 @@ Buffadin.EventFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
 Buffadin.EventFrame:RegisterEvent("CHAT_MSG_ADDON")
 Buffadin.EventFrame:RegisterEvent("SPELLS_CHANGED")
 
+function Buffadin:InitDB()
+    -- Migrate legacy PallyPowerForeverDB if present
+    if PallyPowerForeverDB and not BuffadinDB then
+        BuffadinDB = CopyTable(PallyPowerForeverDB)
+    end
+    if not BuffadinDB then
+        BuffadinDB = {}
+    end
+    if not BuffadinDB.characters then
+        BuffadinDB.characters = {}
+    end
+
+    local charName = UnitName("player")
+    local realmName = GetRealmName and GetRealmName()
+    local charKey = (charName and realmName and (realmName ~= "")) and (charName .. " - " .. realmName) or (charName or "Default")
+
+    -- Migrate legacy un-scoped profile into this character's profile if present (one-time migration)
+    local isFirstCharInit = (next(BuffadinDB.characters) == nil)
+    if isFirstCharInit and BuffadinDB.profile and not BuffadinDB.characters[charKey] then
+        BuffadinDB.characters[charKey] = CopyTable(BuffadinDB.profile)
+    end
+
+    if not BuffadinDB.characters[charKey] then
+        BuffadinDB.characters[charKey] = {}
+    end
+
+    local charProfile = BuffadinDB.characters[charKey]
+
+    -- Apply defaults for any missing keys (preserves explicit false/nil values)
+    for k, v in pairs(Buffadin.DEFAULT_CONFIG) do
+        if charProfile[k] == nil then
+            if type(v) == "table" then
+                charProfile[k] = CopyTable(v)
+            else
+                charProfile[k] = v
+            end
+        end
+    end
+
+    Buffadin.db = { profile = charProfile }
+    BuffadinDB.profile = charProfile -- Alias for backwards compatibility
+
+    -- Restore saved assignments into runtime tables
+    if charProfile.assignments then
+        Buffadin.Assignments.data = charProfile.assignments
+    else
+        charProfile.assignments = Buffadin.Assignments.data
+    end
+    if charProfile.normalAssignments then
+        Buffadin.Assignments.normalData = charProfile.normalAssignments
+    else
+        charProfile.normalAssignments = Buffadin.Assignments.normalData
+    end
+    if charProfile.auraAssignments then
+        Buffadin.Assignments.auraData = charProfile.auraAssignments
+    else
+        charProfile.auraAssignments = Buffadin.Assignments.auraData
+    end
+end
+
 Buffadin.EventFrame:SetScript("OnEvent", function(self, event, ...)
     if event == "ADDON_LOADED" then
         local loadedAddon = ...
-                if loadedAddon == addonName or loadedAddon == "Buffadin" or loadedAddon == "buffadin" then
-            -- Migrate legacy PallyPowerForeverDB if present
-            if PallyPowerForeverDB and not BuffadinDB then
-                BuffadinDB = CopyTable(PallyPowerForeverDB)
-            end
-            -- Initialize SavedVariables
-            if not BuffadinDB then
-                BuffadinDB = {}
-            end
-            if not BuffadinDB.profile then
-                BuffadinDB.profile = {}
-            end
-
-            -- Apply defaults for any missing keys
-            for k, v in pairs(Buffadin.DEFAULT_CONFIG) do
-                if BuffadinDB.profile[k] == nil then
-                    if type(v) == "table" then
-                        BuffadinDB.profile[k] = CopyTable(v)
-                    else
-                        BuffadinDB.profile[k] = v
-                    end
-                end
-            end
-
-            Buffadin.db = BuffadinDB
-
-            -- Restore saved assignments
-            if Buffadin.db.profile.assignments then
-                Buffadin.Assignments.data = Buffadin.db.profile.assignments
-            end
-            if Buffadin.db.profile.normalAssignments then
-                Buffadin.Assignments.normalData = Buffadin.db.profile.normalAssignments
-            end
-            if Buffadin.db.profile.auraAssignments then
-                Buffadin.Assignments.auraData = Buffadin.db.profile.auraAssignments
-            end
+        if loadedAddon == addonName or (loadedAddon and loadedAddon:lower() == "buffadin") then
+            Buffadin:InitDB()
 
             -- Register comm prefixes
             Buffadin:RegisterComm(Buffadin.COMM_PREFIX)
@@ -139,6 +165,9 @@ Buffadin.EventFrame:SetScript("OnEvent", function(self, event, ...)
         end
 
     elseif event == "PLAYER_LOGIN" then
+        -- Ensure character-specific DB is initialized once player/realm names are finalized
+        Buffadin:InitDB()
+
         -- Initialize UI elements
         Buffadin.PlayerPopups:Initialize()
         Buffadin.BlessingsBar:Initialize()

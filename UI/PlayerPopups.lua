@@ -93,6 +93,12 @@ function Popups:GetOrCreateButton(index)
         end
     end)
 
+    local function GetRowTooltipAnchor()
+        local screenWidth = (UIParent and UIParent:GetWidth()) or 1920
+        local pX = Popups:GetCenter()
+        return (pX and pX > screenWidth / 2) and "ANCHOR_LEFT" or "ANCHOR_RIGHT"
+    end
+
     overrideBtn:SetScript("OnEnter", function(self)
         Popups:CancelHide()
         if not self.unitName or not self.classId then return end
@@ -102,7 +108,7 @@ function Popups:GetOrCreateButton(index)
         local gIndex = Buffadin.Assignments:GetGreater(pallyName, self.classId)
         local gConfig = Buffadin.GREATER_BLESSINGS[gIndex]
 
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetOwner(self, GetRowTooltipAnchor())
         GameTooltip:AddLine(self.unitName .. " - Blessing Override", 0.95, 0.82, 0.3)
         if nIndex > 0 and nConfig then
             GameTooltip:AddLine("Current Override: |cff00ccff" .. nConfig.name .. "|r", 1, 1, 1)
@@ -129,7 +135,7 @@ function Popups:GetOrCreateButton(index)
     btn:SetScript("OnEnter", function(self)
         Popups:CancelHide()
         if self.unitInfo then
-            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetOwner(self, GetRowTooltipAnchor())
             GameTooltip:AddLine(self.unitInfo.name, 1, 1, 1)
             if self.unitInfo.isTank then
                 GameTooltip:AddLine("|cff00ccff[Main Tank]|r", 0, 1, 1)
@@ -181,9 +187,28 @@ function Popups:ShowForClass(classId, anchorFrame)
     local totalHeight = (#units * btnHeight) + (padding * 2)
     self:SetSize(182, totalHeight)
 
-    -- Anchor popup above the class button
+    local db = Buffadin.db.profile
+    local isVertical = (db.orientation == "VERTICAL")
+    local screenWidth = (UIParent and UIParent:GetWidth()) or 1920
+    local screenHeight = (UIParent and UIParent:GetHeight()) or 1080
+    local anchorX, anchorY = anchorFrame:GetCenter()
+    anchorX = anchorX or (screenWidth / 2)
+    anchorY = anchorY or (screenHeight / 2)
+
     self:ClearAllPoints()
-    self:SetPoint("BOTTOM", anchorFrame, "TOP", 0, 6)
+    if isVertical then
+        if anchorX >= (screenWidth / 2) then
+            self:SetPoint("TOPRIGHT", anchorFrame, "TOPLEFT", -6, 0)
+        else
+            self:SetPoint("TOPLEFT", anchorFrame, "TOPRIGHT", 6, 0)
+        end
+    else
+        if anchorY >= (screenHeight / 2) then
+            self:SetPoint("TOP", anchorFrame, "BOTTOM", 0, -6)
+        else
+            self:SetPoint("BOTTOM", anchorFrame, "TOP", 0, 6)
+        end
+    end
 
     local yOffset = -padding
     for i, unitInfo in ipairs(units) do

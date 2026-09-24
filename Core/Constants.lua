@@ -51,11 +51,8 @@ Buffadin.NORMAL_BLESSINGS = {
     [4] = { id = 4, name = "Blessing of Salvation", icon = "Interface\\Icons\\Spell_Holy_SealOfSalvation", spellId = 1038 },
     [5] = { id = 5, name = "Blessing of Light", icon = "Interface\\Icons\\Spell_Holy_PrayerOfHealing02", spellId = 19977 },
     [6] = { id = 6, name = "Blessing of Sanctuary", icon = "Interface\\Icons\\Spell_Nature_LightningShield", spellId = 20911 },
-    [7] = { id = 7, name = "Blessing of Sacrifice", icon = "Interface\\Icons\\Spell_Holy_SealOfSacrifice", spellId = 6940 },
-    [8] = { id = 8, name = "Blessing of Protection", icon = "Interface\\Icons\\Spell_Holy_SealOfProtection", spellId = 1022 },
-    [9] = { id = 9, name = "Blessing of Freedom", icon = "Interface\\Icons\\Spell_Holy_SealOfValor", spellId = 1044 },
 }
-Buffadin.MAX_NORMAL_BLESSINGS = 9
+Buffadin.MAX_NORMAL_BLESSINGS = 6
 
 -- Map Greater Blessing Index to Corresponding Normal Blessing Index
 Buffadin.GREATER_TO_NORMAL = {
@@ -115,6 +112,7 @@ Buffadin.DEFAULT_CONFIG = {
     scale = 1.0,
     barScale = 1.0,
     barLocked = false,
+    orientation = "HORIZONTAL", -- "HORIZONTAL" or "VERTICAL"
     barPoint = "CENTER",
     barX = 0,
     barY = -150,

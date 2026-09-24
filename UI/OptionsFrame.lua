@@ -4,7 +4,7 @@ Buffadin.OptionsFrame = CreateFrame("Frame", "BuffadinOptionsFrame", UIParent, "
 local Frame = Buffadin.OptionsFrame
 
 function Frame:Initialize()
-    self:SetSize(420, 480)
+    self:SetSize(420, 520)
     self:SetPoint("CENTER", UIParent, "CENTER", 50, -20)
     self:SetFrameStrata("DIALOG")
     self:SetFrameLevel(100)
@@ -55,7 +55,8 @@ function Frame:Initialize()
         cb.optKey = opt.key
 
         cb:SetScript("OnClick", function(self)
-            local isChecked = self:GetChecked()
+            local checked = self:GetChecked()
+            local isChecked = (checked == true or checked == 1)
             Buffadin.db.profile[self.optKey] = isChecked
             Buffadin.BlessingsBar:UpdateLayout()
         end)
@@ -87,6 +88,20 @@ function Frame:Initialize()
         Buffadin.BlessingsBar:SetScale(val)
     end)
     self.scaleSlider = slider
+
+    -- Orientation Toggle Button
+    local orientBtn = CreateFrame("Button", "Buffadin_OrientBtn", parent, "UIPanelButtonTemplate")
+    orientBtn:SetSize(200, 24)
+    orientBtn:SetPoint("TOPLEFT", slider, "BOTTOMLEFT", 0, -18)
+    Buffadin.Theme:StyleButton(orientBtn, "Orientation: Horizontal")
+    orientBtn:SetScript("OnClick", function()
+        local current = Buffadin.db.profile.orientation or "HORIZONTAL"
+        local newOrient = (current == "HORIZONTAL") and "VERTICAL" or "HORIZONTAL"
+        Buffadin.db.profile.orientation = newOrient
+        orientBtn:SetText("Orientation: " .. (newOrient == "HORIZONTAL" and "Horizontal" or "Vertical"))
+        Buffadin.BlessingsBar:UpdateLayout()
+    end)
+    self.orientBtn = orientBtn
 
     -- Reset Position Button
     local resetBtn = CreateFrame("Button", "Buffadin_ResetPosBtn", parent, "UIPanelButtonTemplate")
@@ -125,5 +140,9 @@ function Frame:RefreshValues()
     end
     if self.scaleSlider then
         self.scaleSlider:SetValue(db.barScale or 1.0)
+    end
+    if self.orientBtn then
+        local orient = db.orientation or "HORIZONTAL"
+        self.orientBtn:SetText("Orientation: " .. (orient == "HORIZONTAL" and "Horizontal" or "Vertical"))
     end
 end

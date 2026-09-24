@@ -48,6 +48,57 @@ function Bar:Initialize()
 end
 
 -- =========================================================================
+-- Tooltip Positioning Helper
+-- =========================================================================
+function Bar:GetTooltipAnchor(btn, isUtility)
+    local db = Buffadin.db.profile
+    local isVertical = (db.orientation == "VERTICAL")
+    local screenWidth = (UIParent and UIParent:GetWidth()) or 1920
+    local screenHeight = (UIParent and UIParent:GetHeight()) or 1080
+    local x, y = btn:GetCenter()
+    x = x or (screenWidth / 2)
+    y = y or (screenHeight / 2)
+
+    if isVertical then
+        if x > (screenWidth / 2) then
+            if isUtility then
+                return "ANCHOR_LEFT", -6, 0
+            else
+                if (screenWidth - x) >= 180 then
+                    return "ANCHOR_RIGHT", 6, 0
+                else
+                    return "ANCHOR_LEFT", -6, 0
+                end
+            end
+        else
+            if isUtility then
+                return "ANCHOR_RIGHT", 6, 0
+            else
+                if x >= 180 then
+                    return "ANCHOR_LEFT", -6, 0
+                else
+                    return "ANCHOR_RIGHT", 6, 0
+                end
+            end
+        end
+    else
+        if y > (screenHeight / 2) then
+            if isUtility then
+                return "ANCHOR_BOTTOM", 0, -4
+            else
+                return "ANCHOR_TOP", 0, 4
+            end
+        else
+            if isUtility then
+                return "ANCHOR_TOP", 0, 4
+            else
+                return "ANCHOR_BOTTOM", 0, -4
+            end
+        end
+    end
+end
+
+-- =========================================================================
 -- Utility Buttons (Auto-Buff, Aura, Righteous Fury, Seal)
 -- =========================================================================
 function Bar:CreateUtilityButtons()
@@ -70,7 +121,8 @@ function Bar:CreateUtilityButtons()
     autoBtn.count = autoCount
 
     autoBtn:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM", 0, -4)
+        local anchor, xOff, yOff = Bar:GetTooltipAnchor(self, true)
+        GameTooltip:SetOwner(self, anchor, xOff, yOff)
         GameTooltip:AddLine("Auto-Buff Next Priority", 0.95, 0.82, 0.3)
 
         local targetUnit, gSpellId, nSpellId, isGreater, bestClassId, reasonText = Buffadin.BuffScanner:GetNextAutoBuff()
@@ -100,6 +152,7 @@ function Bar:CreateUtilityButtons()
     auraBtn:SetSize(40, 40)
     Buffadin.Theme:ApplyCardBackdrop(auraBtn, 0.90, 0.80)
     auraBtn:RegisterForClicks("AnyUp", "AnyDown")
+    auraBtn:EnableMouseWheel(true)
 
     local auraIcon = auraBtn:CreateTexture(nil, "ARTWORK")
     auraIcon:SetSize(28, 28)
@@ -109,16 +162,38 @@ function Bar:CreateUtilityButtons()
     auraBtn.icon = auraIcon
 
     auraBtn:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM", 0, -4)
+        local anchor, xOff, yOff = Bar:GetTooltipAnchor(self, true)
+        GameTooltip:SetOwner(self, anchor, xOff, yOff)
         GameTooltip:AddLine("Assigned Paladin Aura", 0.95, 0.82, 0.3)
         local playerName = UnitName("player")
         local auraIndex = Buffadin.Assignments:GetAura(playerName)
         local aInfo = Buffadin.AURAS[auraIndex]
         GameTooltip:AddLine("Assigned: " .. (aInfo and aInfo.name or "None"), 1, 1, 1)
         GameTooltip:AddLine("Left-Click: Cast Aura", 0, 1, 0)
+        GameTooltip:AddLine("Scroll / Shift-Click: Cycle Assigned Aura", 0.7, 0.7, 0.7)
         GameTooltip:Show()
     end)
     auraBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    auraBtn:SetScript("OnMouseWheel", function(self, delta)
+        local pallyName = UnitName("player")
+        local step = (delta > 0) and 1 or -1
+        Buffadin.Assignments:CycleAura(pallyName, step)
+        if GetMouseFocus and GetMouseFocus() == self then
+            self:GetScript("OnEnter")(self)
+        end
+    end)
+
+    auraBtn:SetScript("PreClick", function(self, button)
+        if IsShiftKeyDown and IsShiftKeyDown() then
+            local pallyName = UnitName("player")
+            local step = (button == "RightButton") and -1 or 1
+            Buffadin.Assignments:CycleAura(pallyName, step)
+            if GetMouseFocus and GetMouseFocus() == self then
+                self:GetScript("OnEnter")(self)
+            end
+        end
+    end)
 
     self.auraButton = auraBtn
 
@@ -136,7 +211,8 @@ function Bar:CreateUtilityButtons()
     rfBtn.icon = rfIcon
 
     rfBtn:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM", 0, -4)
+        local anchor, xOff, yOff = Bar:GetTooltipAnchor(self, true)
+        GameTooltip:SetOwner(self, anchor, xOff, yOff)
         GameTooltip:AddLine("Righteous Fury", 0.95, 0.82, 0.3)
         GameTooltip:AddLine("Left-Click: Cast Righteous Fury", 0, 1, 0)
         GameTooltip:Show()
@@ -155,6 +231,7 @@ function Bar:CreateClassButtons()
         btn:SetSize(56, 40)
         Buffadin.Theme:ApplyCardBackdrop(btn, 0.85, 0.70)
         btn:RegisterForClicks("AnyUp", "AnyDown")
+        btn:EnableMouseWheel(true)
 
         btn.classId = cls.id
         btn.classToken = cls.token
@@ -190,7 +267,8 @@ function Bar:CreateClassButtons()
 
         -- Tooltip & Flyout trigger
         btn:SetScript("OnEnter", function(self)
-            GameTooltip:SetOwner(self, "ANCHOR_BOTTOM", 0, -4)
+            local anchor, xOff, yOff = Bar:GetTooltipAnchor(self, false)
+            GameTooltip:SetOwner(self, anchor, xOff, yOff)
             local clsConfig = Buffadin.CLASS_BY_ID[self.classId]
             GameTooltip:AddLine(clsConfig and clsConfig.name or "Class", 0.95, 0.82, 0.3)
 
@@ -210,6 +288,7 @@ function Bar:CreateClassButtons()
             GameTooltip:AddLine(" ")
             GameTooltip:AddLine("|cff00ff00Left-Click:|r Cast Greater Blessing (or Normal if unlearned)", 0.7, 0.7, 0.7)
             GameTooltip:AddLine("|cff00ff00Right-Click:|r Cast Normal Blessing", 0.7, 0.7, 0.7)
+            GameTooltip:AddLine("|cff00ff00Scroll / Shift-Click:|r Cycle Assigned Blessing", 0.7, 0.7, 0.7)
             GameTooltip:AddLine("|cff00ff00Hover:|r View class members flyout", 0.7, 0.7, 0.7)
             GameTooltip:Show()
 
@@ -222,6 +301,26 @@ function Bar:CreateClassButtons()
             GameTooltip:Hide()
             if Buffadin.PlayerPopups and not Buffadin.PlayerPopups:IsMouseOver() then
                 Buffadin.PlayerPopups:ScheduleHide()
+            end
+        end)
+
+        btn:SetScript("OnMouseWheel", function(self, delta)
+            local pallyName = UnitName("player")
+            local step = (delta > 0) and 1 or -1
+            Buffadin.Assignments:CycleGreater(pallyName, self.classId, step)
+            if GetMouseFocus and GetMouseFocus() == self then
+                self:GetScript("OnEnter")(self)
+            end
+        end)
+
+        btn:SetScript("PreClick", function(self, button)
+            if IsShiftKeyDown and IsShiftKeyDown() then
+                local pallyName = UnitName("player")
+                local step = (button == "RightButton") and -1 or 1
+                Buffadin.Assignments:CycleGreater(pallyName, self.classId, step)
+                if GetMouseFocus and GetMouseFocus() == self then
+                    self:GetScript("OnEnter")(self)
+                end
             end
         end)
 
@@ -255,35 +354,39 @@ function Bar:UpdateLayout()
 
     self:Show()
 
-    local offsetX = 4
+    local isVertical = (db.orientation == "VERTICAL")
+    local offset = 4
     local btnSpacing = 4
+
+    local function PlaceButton(btn, w, h)
+        btn:ClearAllPoints()
+        if isVertical then
+            btn:SetPoint("TOP", self, "TOP", 0, -offset)
+            offset = offset + h + btnSpacing
+        else
+            btn:SetPoint("LEFT", self, "LEFT", offset, 0)
+            offset = offset + w + btnSpacing
+        end
+        btn:Show()
+    end
 
     -- 1. Position Auto-Buff Button
     if db.showAutoButton and self.autoButton then
-        self.autoButton:ClearAllPoints()
-        self.autoButton:SetPoint("LEFT", self, "LEFT", offsetX, 0)
-        self.autoButton:Show()
-        offsetX = offsetX + 40 + btnSpacing
+        PlaceButton(self.autoButton, 40, 40)
     elseif self.autoButton then
         self.autoButton:Hide()
     end
 
     -- 2. Position Aura Button
     if db.showAuraButton and self.auraButton then
-        self.auraButton:ClearAllPoints()
-        self.auraButton:SetPoint("LEFT", self, "LEFT", offsetX, 0)
-        self.auraButton:Show()
-        offsetX = offsetX + 40 + btnSpacing
+        PlaceButton(self.auraButton, 40, 40)
     elseif self.auraButton then
         self.auraButton:Hide()
     end
 
     -- 3. Position Righteous Fury Button
     if db.showRfButton and self.rfButton then
-        self.rfButton:ClearAllPoints()
-        self.rfButton:SetPoint("LEFT", self, "LEFT", offsetX, 0)
-        self.rfButton:Show()
-        offsetX = offsetX + 40 + btnSpacing
+        PlaceButton(self.rfButton, 40, 40)
     elseif self.rfButton then
         self.rfButton:Hide()
     end
@@ -294,23 +397,23 @@ function Bar:UpdateLayout()
         local btn = self.buttons[cls.id]
         local classUnits = Buffadin.Roster.classes[cls.id]
         local hasMembers = classUnits and (#classUnits > 0)
-        local playerName = UnitName("player")
-        local gIndex = Buffadin.Assignments:GetGreater(playerName, cls.id)
 
         -- Show button only if class has members present in the group
         if hasMembers then
-            btn:ClearAllPoints()
-            btn:SetPoint("LEFT", self, "LEFT", offsetX, 0)
-            btn:Show()
-            offsetX = offsetX + 56 + btnSpacing
+            PlaceButton(btn, 56, 40)
             visibleClassCount = visibleClassCount + 1
         else
             btn:Hide()
         end
     end
 
-    local totalWidth = math.max(120, offsetX + 2)
-    self:SetWidth(totalWidth)
+    if isVertical then
+        local totalHeight = math.max(64, offset + 2)
+        self:SetSize(64, totalHeight)
+    else
+        local totalWidth = math.max(120, offset + 2)
+        self:SetSize(totalWidth, 48)
+    end
 
     self:RefreshDisplay()
 end
@@ -457,6 +560,7 @@ function Bar:RefreshDisplay()
                     btn:SetAttribute("spell1", nil)
                     btn:SetAttribute("unit1", nil)
                 end
+                btn:SetAttribute("shift-type1", "")
 
                 -- Configure Right Click: Single Normal Blessing (or Override)
                 if rightSpellName ~= "" and rightTarget then
@@ -468,6 +572,7 @@ function Bar:RefreshDisplay()
                     btn:SetAttribute("spell2", nil)
                     btn:SetAttribute("unit2", nil)
                 end
+                btn:SetAttribute("shift-type2", "")
             end
         end
     end
@@ -541,6 +646,9 @@ function Bar:RefreshDisplay()
                 self.auraButton:SetAttribute("type", isMock and nil or "spell")
                 self.auraButton:SetAttribute("spell", aName)
                 self.auraButton:SetAttribute("unit", "player")
+                self.auraButton:SetAttribute("shift-type", "")
+                self.auraButton:SetAttribute("shift-type1", "")
+                self.auraButton:SetAttribute("shift-type2", "")
             end
         else
             self.auraButton.icon:SetTexture(Buffadin.AURAS[0].icon)
@@ -549,6 +657,9 @@ function Bar:RefreshDisplay()
                 self.auraButton:SetAttribute("type", nil)
                 self.auraButton:SetAttribute("spell", nil)
                 self.auraButton:SetAttribute("unit", nil)
+                self.auraButton:SetAttribute("shift-type", "")
+                self.auraButton:SetAttribute("shift-type1", "")
+                self.auraButton:SetAttribute("shift-type2", "")
             end
         end
     end
