@@ -111,10 +111,12 @@ function Buffadin.Roster:Update()
                 -- Track Paladins
                 if classToken == "PALADIN" then
                     self.paladinCount = self.paladinCount + 1
+                    local isPlayer = UnitIsUnit(unit, "player")
+                    local pallyKey = isPlayer and (UnitName("player") or name) or fullName
                     local pallyInfo = {
-                        name = fullName,
+                        name = pallyKey,
                         unitId = unit,
-                        isPlayer = UnitIsUnit(unit, "player"),
+                        isPlayer = isPlayer,
                         isLeader = UnitIsGroupLeader(unit),
                         isAssist = UnitIsGroupAssistant(unit),
                         spells = {},
@@ -130,7 +132,7 @@ function Buffadin.Roster:Update()
                         pallyInfo.hasWisdom = Buffadin:IsSpellKnown(19742) or Buffadin:IsSpellKnown(25894)
                     else
                         -- Preserve previously known remote spells if available
-                        local prev = oldPaladins[fullName]
+                        local prev = oldPaladins[pallyKey]
                         if prev then
                             pallyInfo.hasKings = prev.hasKings
                             pallyInfo.hasSanctuary = prev.hasSanctuary
@@ -148,8 +150,8 @@ function Buffadin.Roster:Update()
                         end
                     end
 
-                    self.paladins[fullName] = pallyInfo
-                    table.insert(self.sortedPaladins, fullName)
+                    self.paladins[pallyKey] = pallyInfo
+                    table.insert(self.sortedPaladins, pallyKey)
                 end
 
                 -- Track pet if enabled

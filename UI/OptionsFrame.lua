@@ -6,8 +6,18 @@ local Frame = Buffadin.OptionsFrame
 function Frame:Initialize()
     self:SetSize(420, 480)
     self:SetPoint("CENTER", UIParent, "CENTER", 50, -20)
+    self:SetFrameStrata("DIALOG")
+    self:SetFrameLevel(100)
     self:SetClampedToScreen(true)
     self:Hide()
+
+    -- Ensure solid opaque background so action bars and world never bleed through
+    if not self.solidBg then
+        local bg = self:CreateTexture(nil, "BACKGROUND", nil, -8)
+        bg:SetAllPoints(self)
+        bg:SetColorTexture(0.06, 0.06, 0.08, 0.98)
+        self.solidBg = bg
+    end
 
     Buffadin.Theme:StyleWindow(self, "Buffadin - Settings", "Interface\\Icons\\Spell_Magic_GreaterBlessingofKings")
     tinsert(UISpecialFrames, "BuffadinOptionsFrame")

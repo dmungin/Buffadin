@@ -6,8 +6,26 @@ Buffadin.Assignments = {
     auraData = {},     -- [pallyName] = auraIndex (0-8)
 }
 
+-- Normalize paladin name so the local player always resolves to UnitName("player")
+function Buffadin.Assignments:NormalizePaladinName(pallyName)
+    if not pallyName or pallyName == "" then return "" end
+    local playerName = UnitName("player")
+    if playerName then
+        if pallyName == playerName then
+            return playerName
+        end
+        local short = pallyName:match("^(.-)%-")
+        if short and short == playerName then
+            return playerName
+        end
+    end
+    return pallyName
+end
+
 -- Ensure tables exist for a Paladin
 function Buffadin.Assignments:EnsurePaladin(pallyName)
+    pallyName = self:NormalizePaladinName(pallyName)
+    if not pallyName or pallyName == "" then return end
     if not self.data[pallyName] then
         self.data[pallyName] = {}
         for _, cls in ipairs(Buffadin.CLASSES) do
@@ -30,13 +48,15 @@ end
 -- =========================================================================
 
 function Buffadin.Assignments:GetGreater(pallyName, classId)
-    if not pallyName or not classId then return 0 end
+    pallyName = self:NormalizePaladinName(pallyName)
+    if not pallyName or pallyName == "" or not classId then return 0 end
     self:EnsurePaladin(pallyName)
     return self.data[pallyName][classId] or 0
 end
 
 function Buffadin.Assignments:SetGreater(pallyName, classId, blessingIndex, skipSync)
-    if not pallyName or not classId then return end
+    pallyName = self:NormalizePaladinName(pallyName)
+    if not pallyName or pallyName == "" or not classId then return end
     self:EnsurePaladin(pallyName)
 
     if not skipSync and not Buffadin.Roster:CanEditAssignments() then
@@ -81,7 +101,8 @@ function Buffadin.Assignments:CycleGreater(pallyName, classId, step)
 end
 
 function Buffadin.Assignments:GetNormal(pallyName, classId, unitName)
-    if not pallyName or not classId or not unitName then return 0 end
+    pallyName = self:NormalizePaladinName(pallyName)
+    if not pallyName or pallyName == "" or not classId or not unitName then return 0 end
     self:EnsurePaladin(pallyName)
     if self.normalData[pallyName][classId] then
         return self.normalData[pallyName][classId][unitName] or 0
@@ -90,7 +111,8 @@ function Buffadin.Assignments:GetNormal(pallyName, classId, unitName)
 end
 
 function Buffadin.Assignments:SetNormal(pallyName, classId, unitName, blessingIndex, skipSync)
-    if not pallyName or not classId or not unitName then return end
+    pallyName = self:NormalizePaladinName(pallyName)
+    if not pallyName or pallyName == "" or not classId or not unitName then return end
     self:EnsurePaladin(pallyName)
 
     if not skipSync and not Buffadin.Roster:CanEditAssignments() then
@@ -115,6 +137,7 @@ function Buffadin.Assignments:SetNormal(pallyName, classId, unitName, blessingIn
 end
 
 function Buffadin.Assignments:CycleNormal(pallyName, classId, unitName, step)
+    pallyName = self:NormalizePaladinName(pallyName)
     if not Buffadin.Roster:CanEditAssignments() then
         Buffadin:Print("Only the Raid Leader or Raid Assistant can modify assignments.")
         return
@@ -134,13 +157,15 @@ function Buffadin.Assignments:CycleNormal(pallyName, classId, unitName, step)
 end
 
 function Buffadin.Assignments:GetAura(pallyName)
-    if not pallyName then return 0 end
+    pallyName = self:NormalizePaladinName(pallyName)
+    if not pallyName or pallyName == "" then return 0 end
     self:EnsurePaladin(pallyName)
     return self.auraData[pallyName] or 0
 end
 
 function Buffadin.Assignments:SetAura(pallyName, auraIndex, skipSync)
-    if not pallyName then return end
+    pallyName = self:NormalizePaladinName(pallyName)
+    if not pallyName or pallyName == "" then return end
     self:EnsurePaladin(pallyName)
 
     if not skipSync and not Buffadin.Roster:CanEditAssignments() then
@@ -165,6 +190,7 @@ function Buffadin.Assignments:SetAura(pallyName, auraIndex, skipSync)
 end
 
 function Buffadin.Assignments:CycleAura(pallyName, step)
+    pallyName = self:NormalizePaladinName(pallyName)
     if not Buffadin.Roster:CanEditAssignments() then
         Buffadin:Print("Only the Raid Leader or Raid Assistant can modify assignments.")
         return

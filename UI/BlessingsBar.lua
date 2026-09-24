@@ -297,8 +297,8 @@ function Bar:UpdateLayout()
         local playerName = UnitName("player")
         local gIndex = Buffadin.Assignments:GetGreater(playerName, cls.id)
 
-        -- Show button if class has members OR has an active blessing assigned
-        if hasMembers or (gIndex > 0) then
+        -- Show button only if class has members present in the group
+        if hasMembers then
             btn:ClearAllPoints()
             btn:SetPoint("LEFT", self, "LEFT", offsetX, 0)
             btn:Show()

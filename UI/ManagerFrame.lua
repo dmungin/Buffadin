@@ -14,8 +14,18 @@ Frame.classLabels = {}  -- [classId] = labelFontString
 function Frame:Initialize()
     self:SetSize(620, 480)
     self:SetPoint("CENTER", UIParent, "CENTER", 0, 50)
+    self:SetFrameStrata("DIALOG")
+    self:SetFrameLevel(50)
     self:SetClampedToScreen(true)
     self:Hide()
+
+    -- Ensure solid opaque background so action bars and world never bleed through
+    if not self.solidBg then
+        local bg = self:CreateTexture(nil, "BACKGROUND", nil, -8)
+        bg:SetAllPoints(self)
+        bg:SetColorTexture(0.06, 0.06, 0.08, 0.98)
+        self.solidBg = bg
+    end
 
     -- Apply Blizzard Native Retail styling
     Buffadin.Theme:StyleWindow(self, "Buffadin - Blessing Manager", "Interface\\Icons\\Spell_Magic_GreaterBlessingofKings")

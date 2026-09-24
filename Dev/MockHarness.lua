@@ -21,7 +21,7 @@ local function CreateMockUnit(unitId, name, classToken, isTank)
     return {
         unitId = unitId,
         name = name,
-        fullName = name .. "-MockServer",
+        fullName = name,
         classToken = classToken,
         classId = cid,
         isTank = isTank or false,
@@ -42,7 +42,7 @@ function Mock:GetPartyRoster()
             CreateMockUnit("party4", "Holyheals", "PRIEST", false),
         },
         paladins = {
-            { name = playerName .. "-MockServer", isPlayer = true, isLeader = true, isAssist = false },
+            { name = playerName, isPlayer = true, isLeader = true, isAssist = false },
         },
     }
 end
@@ -89,9 +89,9 @@ function Mock:GetRaid25Roster()
             CreateMockUnit("raid25", "Chainheal", "SHAMAN", false),
         },
         paladins = {
-            { name = playerName .. "-MockServer", isPlayer = true, isLeader = true, isAssist = false },
-            { name = "Uther-MockServer", isPlayer = false, isLeader = false, isAssist = true },
-            { name = "Tirion-MockServer", isPlayer = false, isLeader = false, isAssist = false },
+            { name = playerName, isPlayer = true, isLeader = true, isAssist = false },
+            { name = "Uther", isPlayer = false, isLeader = false, isAssist = true },
+            { name = "Tirion", isPlayer = false, isLeader = false, isAssist = false },
         },
     }
 end
@@ -155,10 +155,10 @@ function Mock:GetRaid40Roster()
     return {
         units = list,
         paladins = {
-            { name = playerName .. "-MockServer", isPlayer = true, isLeader = true, isAssist = false },
-            { name = "Uther-MockServer", isPlayer = false, isLeader = false, isAssist = true },
-            { name = "Tirion-MockServer", isPlayer = false, isLeader = false, isAssist = false },
-            { name = "Turalyon-MockServer", isPlayer = false, isLeader = false, isAssist = false },
+            { name = playerName, isPlayer = true, isLeader = true, isAssist = false },
+            { name = "Uther", isPlayer = false, isLeader = false, isAssist = true },
+            { name = "Tirion", isPlayer = false, isLeader = false, isAssist = false },
+            { name = "Turalyon", isPlayer = false, isLeader = false, isAssist = false },
         },
     }
 end
@@ -730,6 +730,13 @@ function Mock:Enable(preset)
     -- Hook addon buttons for direct click simulation
     self:HookInteractiveButtons()
 
+    -- Backup real assignments so mock testing never corrupts player's real setup
+    if not self.savedAssignments then
+        self.savedAssignments = CopyTable(Buffadin.Assignments.data)
+        self.savedNormalAssignments = CopyTable(Buffadin.Assignments.normalData)
+        self.savedAuraAssignments = CopyTable(Buffadin.Assignments.auraData)
+    end
+
     -- Pre-populate mock assignments if empty
     self:ApplyDefaultAssignments()
 
@@ -757,6 +764,21 @@ function Mock:Disable()
     if self.origBuffScannerScan then Buffadin.BuffScanner.Scan = self.origBuffScannerScan end
     if self.origInCombat then Buffadin.InCombat = self.origInCombat end
     if self.origCanEdit then Buffadin.Roster.CanEditAssignments = self.origCanEdit end
+
+    -- Restore real saved assignments
+    if self.savedAssignments then
+        Buffadin.Assignments.data = CopyTable(self.savedAssignments)
+        Buffadin.Assignments.normalData = CopyTable(self.savedNormalAssignments or {})
+        Buffadin.Assignments.auraData = CopyTable(self.savedAuraAssignments or {})
+        self.savedAssignments = nil
+        self.savedNormalAssignments = nil
+        self.savedAuraAssignments = nil
+        if Buffadin.db and Buffadin.db.profile then
+            Buffadin.db.profile.assignments = Buffadin.Assignments.data
+            Buffadin.db.profile.normalAssignments = Buffadin.Assignments.normalData
+            Buffadin.db.profile.auraAssignments = Buffadin.Assignments.auraData
+        end
+    end
 
     -- Restore real state and live secure casting attributes
     Buffadin.Roster:Update()
@@ -944,6 +966,7 @@ function Mock:CreateControlPanel()
     panel:SetSize(480, 450)
     panel:SetPoint("CENTER", UIParent, "CENTER", 180, 0)
     panel:SetFrameStrata("DIALOG")
+    panel:SetFrameLevel(110)
     panel:SetMovable(true)
     panel:EnableMouse(true)
     panel:RegisterForDrag("LeftButton")
@@ -952,6 +975,14 @@ function Mock:CreateControlPanel()
     panel:SetClampedToScreen(true)
     panel:Hide()
     tinsert(UISpecialFrames, "Buffadin_MockControlPanel")
+
+    -- Solid background to prevent action bars or world bleeding through
+    if not panel.solidBg then
+        local bg = panel:CreateTexture(nil, "BACKGROUND", nil, -8)
+        bg:SetAllPoints(panel)
+        bg:SetColorTexture(0.06, 0.06, 0.08, 0.98)
+        panel.solidBg = bg
+    end
 
     Buffadin.Theme:ApplyCardBackdrop(panel, 0.95, 0.85)
 
