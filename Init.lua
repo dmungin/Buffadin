@@ -36,6 +36,39 @@ SlashCmdList["BUFFADIN"] = function(msg)
         Buffadin.BlessingsBar:ClearAllPoints()
         Buffadin.BlessingsBar:SetPoint("CENTER", UIParent, "CENTER", 0, -150)
         Buffadin:Print("Buff Bar position reset to center.")
+    elseif msg == "minimap" or msg:find("^minimap") then
+        local _, arg = strsplit(" ", msg, 2)
+        arg = arg and string.lower(string.trim(arg)) or ""
+        if arg == "reset" or arg == "rim" or arg == "auto" then
+            Buffadin.db.profile.minimap.radius = nil
+            Buffadin.MinimapButton:UpdatePosition()
+            Buffadin:Print("Minimap icon distance reset to rim.")
+            if Buffadin.OptionsFrame and Buffadin.OptionsFrame:IsShown() and Buffadin.OptionsFrame.RefreshValues then
+                Buffadin.OptionsFrame:RefreshValues()
+            end
+        elseif tonumber(arg) then
+            local dist = tonumber(arg)
+            dist = math.max(30, math.min(dist, 300))
+            Buffadin.db.profile.minimap.radius = dist
+            Buffadin.MinimapButton:UpdatePosition()
+            Buffadin:Print("Minimap icon distance set to " .. dist .. " px.")
+            if Buffadin.OptionsFrame and Buffadin.OptionsFrame:IsShown() and Buffadin.OptionsFrame.RefreshValues then
+                Buffadin.OptionsFrame:RefreshValues()
+            end
+        elseif arg == "toggle" or arg == "hide" or arg == "show" then
+            local hide = (arg == "hide") or (arg == "toggle" and not Buffadin.db.profile.minimap.hide)
+            Buffadin.db.profile.minimap.hide = hide
+            Buffadin.MinimapButton:UpdatePosition()
+            Buffadin:Print(hide and "Minimap icon hidden." or "Minimap icon shown.")
+            if Buffadin.OptionsFrame and Buffadin.OptionsFrame:IsShown() and Buffadin.OptionsFrame.RefreshValues then
+                Buffadin.OptionsFrame:RefreshValues()
+            end
+        else
+            Buffadin:Print("Minimap commands:")
+            print("  |cff00ff00/buffadin minimap reset|r - Snap icon to minimap rim")
+            print("  |cff00ff00/buffadin minimap <distance>|r - Set distance from minimap center (e.g. 110)")
+            print("  |cff00ff00/buffadin minimap toggle|r - Show or hide minimap button")
+        end
     elseif msg == "report" then
         Buffadin.Assignments:Report()
     elseif msg == "auto" or msg == "assign" then
@@ -77,6 +110,7 @@ SlashCmdList["BUFFADIN"] = function(msg)
         print("  |cff00ff00/buffadin clear|r - Clear all assignments")
         print("  |cff00ff00/buffadin report|r - Broadcast blessings to chat")
         print("  |cff00ff00/buffadin reset|r - Reset bar position to center")
+        print("  |cff00ff00/buffadin minimap [reset|<dist>]|r - Adjust or reset minimap icon distance")
         print("  |cff00ff00/buffadin mock|r - Open In-Game Mock Test Harness")
     end
 end

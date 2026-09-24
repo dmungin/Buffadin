@@ -4,6 +4,7 @@
 ## Author: Buffadin Team
 ## Version: 1.0.0
 ## SavedVariables: BuffadinDB
+## LoadSavedVariablesFirst: 1
 ## IconTexture: Interface\Icons\Spell_Magic_GreaterBlessingofKings
 
 Core\Compat.lua

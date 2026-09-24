@@ -4,7 +4,7 @@ Buffadin.OptionsFrame = CreateFrame("Frame", "BuffadinOptionsFrame", UIParent, "
 local Frame = Buffadin.OptionsFrame
 
 function Frame:Initialize()
-    self:SetSize(420, 520)
+    self:SetSize(420, 480)
     self:SetPoint("CENTER", UIParent, "CENTER", 50, -20)
     self:SetFrameStrata("DIALOG")
     self:SetFrameLevel(100)
@@ -24,8 +24,8 @@ function Frame:Initialize()
 
     local parent = self.Inset or self
 
-    local startY = -20
-    local spacing = 26
+    local startY = -16
+    local spacing = 24
 
     local options = {
         { key = "enabled",          text = "Enable Addon" },
@@ -33,13 +33,12 @@ function Frame:Initialize()
         { key = "showWhenSolo",     text = "Show Buff Bar When Solo" },
         { key = "showInParty",      text = "Show Buff Bar In Party" },
         { key = "showInRaid",       text = "Show Buff Bar In Raid" },
-        { key = "showCounts",       text = "Show Missing Buff Count Badge" },
-        { key = "showTimers",       text = "Show Expiration Timers" },
         { key = "showAutoButton",   text = "Show Auto-Buff Button" },
         { key = "showAuraButton",   text = "Show Paladin Aura Button" },
         { key = "showRfButton",     text = "Show Righteous Fury Button" },
         { key = "showPlayerPopups", text = "Show Player Popups on Hover" },
         { key = "showPets",         text = "Track Hunter/Warlock Pets" },
+        { key = "showMinimap",      text = "Show Minimap Button" },
     }
 
     self.checkboxes = {}
@@ -57,18 +56,25 @@ function Frame:Initialize()
         cb:SetScript("OnClick", function(self)
             local checked = self:GetChecked()
             local isChecked = (checked == true or checked == 1)
-            Buffadin.db.profile[self.optKey] = isChecked
-            Buffadin.BlessingsBar:UpdateLayout()
+            if self.optKey == "showMinimap" then
+                Buffadin.db.profile.minimap.hide = not isChecked
+                if Buffadin.MinimapButton and Buffadin.MinimapButton.UpdatePosition then
+                    Buffadin.MinimapButton:UpdatePosition()
+                end
+            else
+                Buffadin.db.profile[self.optKey] = isChecked
+                Buffadin.BlessingsBar:UpdateLayout()
+            end
         end)
 
         self.checkboxes[opt.key] = cb
     end
 
     -- Scale Slider
-    local sliderY = startY - (#options * spacing) - 10
+    local sliderY = startY - (#options * spacing) - 14
     local slider = CreateFrame("Slider", "Buffadin_ScaleSlider", parent, "OptionsSliderTemplate")
     slider:SetPoint("TOPLEFT", parent, "TOPLEFT", 24, sliderY)
-    slider:SetWidth(200)
+    slider:SetWidth(180)
     slider:SetMinMaxValues(0.6, 1.6)
     slider:SetValueStep(0.05)
     slider:SetObeyStepOnDrag(true)
@@ -86,49 +92,65 @@ function Frame:Initialize()
         val = math.floor(val * 100 + 0.5) / 100
         Buffadin.db.profile.barScale = val
         Buffadin.BlessingsBar:SetScale(val)
+        if sliderTitle then
+            sliderTitle:SetText(string.format("Buff Bar Scale (%d%%)", math.floor(val * 100 + 0.5)))
+        end
     end)
     self.scaleSlider = slider
 
-    -- Orientation Toggle Button
-    local orientBtn = CreateFrame("Button", "Buffadin_OrientBtn", parent, "UIPanelButtonTemplate")
-    orientBtn:SetSize(200, 24)
-    orientBtn:SetPoint("TOPLEFT", slider, "BOTTOMLEFT", 0, -18)
-    Buffadin.Theme:StyleButton(orientBtn, "Orientation: Horizontal")
-    orientBtn:SetScript("OnClick", function()
-        local current = Buffadin.db.profile.orientation or "HORIZONTAL"
-        local newOrient = (current == "HORIZONTAL") and "VERTICAL" or "HORIZONTAL"
-        Buffadin.db.profile.orientation = newOrient
-        orientBtn:SetText("Orientation: " .. (newOrient == "HORIZONTAL" and "Horizontal" or "Vertical"))
+    -- Bar Orientation (Radio Buttons)
+    local orientLabel = parent:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    orientLabel:SetPoint("TOPLEFT", parent, "TOPLEFT", 24, sliderY - 38)
+    orientLabel:SetText("Bar Orientation:")
+    self.orientLabel = orientLabel
+
+    local horizRadio = CreateFrame("CheckButton", "Buffadin_Radio_Horizontal", parent, "UIRadioButtonTemplate")
+    horizRadio:SetSize(16, 16)
+    horizRadio:SetPoint("TOPLEFT", orientLabel, "BOTTOMLEFT", 2, -6)
+    horizRadio.text = _G[horizRadio:GetName() .. "Text"]
+    if horizRadio.text then
+        horizRadio.text:SetFontObject(GameFontNormalSmall)
+        horizRadio.text:SetText("Horizontal")
+    end
+
+    local vertRadio = CreateFrame("CheckButton", "Buffadin_Radio_Vertical", parent, "UIRadioButtonTemplate")
+    vertRadio:SetSize(16, 16)
+    vertRadio:SetPoint("LEFT", horizRadio, "RIGHT", 100, 0)
+    vertRadio.text = _G[vertRadio:GetName() .. "Text"]
+    if vertRadio.text then
+        vertRadio.text:SetFontObject(GameFontNormalSmall)
+        vertRadio.text:SetText("Vertical")
+    end
+
+    horizRadio:SetScript("OnClick", function(self)
+        self:SetChecked(true)
+        vertRadio:SetChecked(false)
+        Buffadin.db.profile.orientation = "HORIZONTAL"
         Buffadin.BlessingsBar:UpdateLayout()
     end)
-    self.orientBtn = orientBtn
 
-    -- Reset Position Button
-    local resetBtn = CreateFrame("Button", "Buffadin_ResetPosBtn", parent, "UIPanelButtonTemplate")
-    resetBtn:SetSize(140, 24)
-    resetBtn:SetPoint("BOTTOMLEFT", parent, "BOTTOMLEFT", 18, 12)
-    Buffadin.Theme:StyleButton(resetBtn, "Reset Bar Position")
-    resetBtn:SetScript("OnClick", function()
-        Buffadin.db.profile.barPoint = "CENTER"
-        Buffadin.db.profile.barX = 0
-        Buffadin.db.profile.barY = -150
-        Buffadin.BlessingsBar:ClearAllPoints()
-        Buffadin.BlessingsBar:SetPoint("CENTER", UIParent, "CENTER", 0, -150)
-        Buffadin:Print("Buff Bar position reset to center.")
+    vertRadio:SetScript("OnClick", function(self)
+        self:SetChecked(true)
+        horizRadio:SetChecked(false)
+        Buffadin.db.profile.orientation = "VERTICAL"
+        Buffadin.BlessingsBar:UpdateLayout()
     end)
-    self.resetBtn = resetBtn
+
+    self.horizRadio = horizRadio
+    self.vertRadio = vertRadio
 
     -- Close Button at bottom
-    local closeBtn = CreateFrame("Button", "Buffadin_OptionsCloseBtn", parent, "UIPanelButtonTemplate")
-    closeBtn:SetSize(80, 24)
-    closeBtn:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", -18, 12)
+    local closeBtn = CreateFrame("Button", "Buffadin_OptionsCloseBtn", self, "UIPanelButtonTemplate")
+    closeBtn:SetSize(80, 22)
+    closeBtn:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT", -16, 6)
     Buffadin.Theme:StyleButton(closeBtn, "Close")
     closeBtn:SetScript("OnClick", function()
         Frame:Hide()
     end)
     self.closeBtn = closeBtn
 
-    self:SetScript("OnShow", function()
+    self:SetScript("OnShow", function(self)
+        self:Raise()
         self:RefreshValues()
     end)
 end
@@ -136,13 +158,25 @@ end
 function Frame:RefreshValues()
     local db = Buffadin.db.profile
     for key, cb in pairs(self.checkboxes) do
-        cb:SetChecked(db[key] == true)
+        if key == "showMinimap" then
+            cb:SetChecked(not (db.minimap and db.minimap.hide))
+        else
+            cb:SetChecked(db[key] == true)
+        end
     end
     if self.scaleSlider then
-        self.scaleSlider:SetValue(db.barScale or 1.0)
+        local scale = db.barScale or 1.0
+        self.scaleSlider:SetValue(scale)
+        local sliderTitle = _G[self.scaleSlider:GetName() .. "Text"]
+        if sliderTitle then
+            sliderTitle:SetText(string.format("Buff Bar Scale (%d%%)", math.floor(scale * 100 + 0.5)))
+        end
     end
-    if self.orientBtn then
-        local orient = db.orientation or "HORIZONTAL"
-        self.orientBtn:SetText("Orientation: " .. (orient == "HORIZONTAL" and "Horizontal" or "Vertical"))
+    local orient = db.orientation or "HORIZONTAL"
+    if self.horizRadio then
+        self.horizRadio:SetChecked(orient == "HORIZONTAL")
+    end
+    if self.vertRadio then
+        self.vertRadio:SetChecked(orient == "VERTICAL")
     end
 end

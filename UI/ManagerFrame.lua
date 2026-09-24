@@ -14,8 +14,8 @@ Frame.classLabels = {}  -- [classId] = labelFontString
 function Frame:Initialize()
     self:SetSize(620, 480)
     self:SetPoint("CENTER", UIParent, "CENTER", 0, 50)
-    self:SetFrameStrata("DIALOG")
-    self:SetFrameLevel(50)
+    self:SetFrameStrata("HIGH")
+    self:SetFrameLevel(20)
     self:SetClampedToScreen(true)
     self:Hide()
 

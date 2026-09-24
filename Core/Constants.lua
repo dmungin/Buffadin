@@ -131,6 +131,7 @@ Buffadin.DEFAULT_CONFIG = {
     minimap = {
         hide = false,
         angle = 220,
+        radius = nil, -- Distance from center (nil = auto rim distance)
     },
     assignments = {},       -- [pallyName][classId] = greaterBlessingIndex
     normalAssignments = {}, -- [pallyName][classId][unitName] = normalBlessingIndex
