@@ -48,10 +48,13 @@ SlashCmdList["BUFFADIN"] = function(msg)
             arg = arg and string.lower(string.trim(arg)) or ""
             if arg == "party" or arg == "5" then
                 Buffadin.MockHarness:SetPreset("PARTY")
+                Buffadin.MockHarness:ShowPanel()
             elseif arg == "raid" or arg == "40" or arg == "raid40" then
                 Buffadin.MockHarness:SetPreset("RAID40")
+                Buffadin.MockHarness:ShowPanel()
             elseif arg == "raid25" or arg == "25" then
                 Buffadin.MockHarness:SetPreset("RAID25")
+                Buffadin.MockHarness:ShowPanel()
             elseif arg == "off" or arg == "stop" or arg == "live" then
                 Buffadin.MockHarness:Disable()
             else

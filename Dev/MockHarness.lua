@@ -950,6 +950,8 @@ function Mock:CreateControlPanel()
     panel:SetScript("OnDragStart", panel.StartMoving)
     panel:SetScript("OnDragStop", panel.StopMovingOrSizing)
     panel:SetClampedToScreen(true)
+    panel:Hide()
+    tinsert(UISpecialFrames, "Buffadin_MockControlPanel")
 
     Buffadin.Theme:ApplyCardBackdrop(panel, 0.95, 0.85)
 
@@ -1124,6 +1126,18 @@ function Mock:UpdatePanelStatus()
     self.panel.statusText:SetText(status)
     if self.panel.btnCombat then
         self.panel.btnCombat:SetText(self.simulatedCombat and "Leave Combat" or "Enter Combat")
+    end
+end
+
+function Mock:ShowPanel()
+    local panel = self:CreateControlPanel()
+    panel:Show()
+    self:UpdatePanelStatus()
+end
+
+function Mock:HidePanel()
+    if self.panel then
+        self.panel:Hide()
     end
 end
 
