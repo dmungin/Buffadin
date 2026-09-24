@@ -1,0 +1,24 @@
+# description of this workflow, can be anything you want
+name: Package and release
+# we need to let GitHub know _when_ we want to release.
+# this is typically only when we create a new tag.
+# make sure your tags are annotated!
+on:
+  push:
+    tags:
+      - '**'
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      CF_API_KEY: ${{ secrets.CF_API_KEY }}
+      GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Clone project
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Package and release
+        uses: BigWigsMods/packager@v2
+        with:
+          args: -n "{project-version}"
