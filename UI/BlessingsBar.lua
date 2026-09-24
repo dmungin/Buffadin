@@ -366,75 +366,81 @@ function Bar:RefreshDisplay()
 
             -- Configure Secure Attributes (Only when out of combat!)
             if not inCombat then
-                local gKnown = (gConfig and gConfig.spellId > 0) and Buffadin:IsSpellKnown(gConfig.spellId)
-                local gSpellName = (gConfig and gConfig.spellId > 0) and Buffadin:GetSpellName(gConfig.spellId) or ""
-                local nIndex = Buffadin.GREATER_TO_NORMAL[gIndex] or 0
-                local nConfig = Buffadin.NORMAL_BLESSINGS[nIndex]
-                local nSpellName = (nConfig and nConfig.spellId > 0) and Buffadin:GetSpellName(nConfig.spellId) or ""
+                local isMock = Buffadin.MockHarness and Buffadin.MockHarness.active
+                if isMock then
+                    btn:SetAttribute("type1", nil)
+                    btn:SetAttribute("type2", nil)
+                else
+                    local gKnown = (gConfig and gConfig.spellId > 0) and Buffadin:IsSpellKnown(gConfig.spellId)
+                    local gSpellName = (gConfig and gConfig.spellId > 0) and Buffadin:GetSpellName(gConfig.spellId) or ""
+                    local nIndex = Buffadin.GREATER_TO_NORMAL[gIndex] or 0
+                    local nConfig = Buffadin.NORMAL_BLESSINGS[nIndex]
+                    local nSpellName = (nConfig and nConfig.spellId > 0) and Buffadin:GetSpellName(nConfig.spellId) or ""
 
-                -- Left Click: Greater Blessing if known, otherwise fallback to Normal Blessing
-                local leftSpellName = (gKnown and gSpellName ~= "") and gSpellName or nSpellName
-                local rightSpellName = nSpellName
+                    -- Left Click: Greater Blessing if known, otherwise fallback to Normal Blessing
+                    local leftSpellName = (gKnown and gSpellName ~= "") and gSpellName or nSpellName
+                    local rightSpellName = nSpellName
 
-                -- Find best target unit for this class (prioritize unbuffed, in-range member without override)
-                local targetUnit = nil
-                local classUnits = Buffadin.Roster.classes[cls.id] or {}
-                local inRangeUnbuffed = nil
-                local anyUnbuffed = nil
+                    -- Find best target unit for this class (prioritize unbuffed, in-range member without override)
+                    local targetUnit = nil
+                    local classUnits = Buffadin.Roster.classes[cls.id] or {}
+                    local inRangeUnbuffed = nil
+                    local anyUnbuffed = nil
 
-                for _, u in ipairs(classUnits) do
-                    local uStatus = Buffadin.BuffScanner.unitStatus[u.unitId]
-                    if uStatus and not uStatus.hasBuff and not uStatus.isSpecial and not u.isDead and u.isOnline and u.isVisible then
-                        if not anyUnbuffed then anyUnbuffed = u.unitId end
-                        if Buffadin:IsUnitInRange(u.unitId, gConfig and gConfig.spellId, leftSpellName) then
-                            inRangeUnbuffed = u.unitId
-                            break
-                        end
-                    end
-                end
-                targetUnit = inRangeUnbuffed or anyUnbuffed
-
-                if not targetUnit then
                     for _, u in ipairs(classUnits) do
                         local uStatus = Buffadin.BuffScanner.unitStatus[u.unitId]
-                        if uStatus and not uStatus.hasBuff and not u.isDead and u.isOnline and u.isVisible then
-                            targetUnit = u.unitId
-                            break
+                        if uStatus and not uStatus.hasBuff and not uStatus.isSpecial and not u.isDead and u.isOnline and u.isVisible then
+                            if not anyUnbuffed then anyUnbuffed = u.unitId end
+                            if Buffadin:IsUnitInRange(u.unitId, gConfig and gConfig.spellId, leftSpellName) then
+                                inRangeUnbuffed = u.unitId
+                                break
+                            end
                         end
                     end
-                end
-                if not targetUnit then
-                    for _, u in ipairs(classUnits) do
-                        if not u.isDead and u.isOnline and u.isVisible then
-                            targetUnit = u.unitId
-                            break
+                    targetUnit = inRangeUnbuffed or anyUnbuffed
+
+                    if not targetUnit then
+                        for _, u in ipairs(classUnits) do
+                            local uStatus = Buffadin.BuffScanner.unitStatus[u.unitId]
+                            if uStatus and not uStatus.hasBuff and not u.isDead and u.isOnline and u.isVisible then
+                                targetUnit = u.unitId
+                                break
+                            end
                         end
                     end
-                end
-                if not targetUnit and #classUnits > 0 then
-                    targetUnit = classUnits[1].unitId
-                end
+                    if not targetUnit then
+                        for _, u in ipairs(classUnits) do
+                            if not u.isDead and u.isOnline and u.isVisible then
+                                targetUnit = u.unitId
+                                break
+                            end
+                        end
+                    end
+                    if not targetUnit and #classUnits > 0 then
+                        targetUnit = classUnits[1].unitId
+                    end
 
-                -- Configure Left Click
-                if leftSpellName ~= "" and targetUnit then
-                    btn:SetAttribute("type1", "spell")
-                    btn:SetAttribute("spell1", leftSpellName)
-                    btn:SetAttribute("unit1", targetUnit)
-                else
-                    btn:SetAttribute("type1", nil)
-                    btn:SetAttribute("spell1", nil)
-                    btn:SetAttribute("unit1", nil)
-                end
+                    -- Configure Left Click
+                    if leftSpellName ~= "" and targetUnit then
+                        btn:SetAttribute("type1", "spell")
+                        btn:SetAttribute("spell1", leftSpellName)
+                        btn:SetAttribute("unit1", targetUnit)
+                    else
+                        btn:SetAttribute("type1", nil)
+                        btn:SetAttribute("spell1", nil)
+                        btn:SetAttribute("unit1", nil)
+                    end
 
-                -- Configure Right Click: Always Normal Blessing
-                if rightSpellName ~= "" and targetUnit then
-                    btn:SetAttribute("type2", "spell")
-                    btn:SetAttribute("spell2", rightSpellName)
-                    btn:SetAttribute("unit2", targetUnit)
-                else
-                    btn:SetAttribute("type2", nil)
-                    btn:SetAttribute("spell2", nil)
-                    btn:SetAttribute("unit2", nil)
+                    -- Configure Right Click: Always Normal Blessing
+                    if rightSpellName ~= "" and targetUnit then
+                        btn:SetAttribute("type2", "spell")
+                        btn:SetAttribute("spell2", rightSpellName)
+                        btn:SetAttribute("unit2", targetUnit)
+                    else
+                        btn:SetAttribute("type2", nil)
+                        btn:SetAttribute("spell2", nil)
+                        btn:SetAttribute("unit2", nil)
+                    end
                 end
             end
         end
@@ -454,26 +460,32 @@ function Bar:RefreshDisplay()
             Buffadin.Theme:SetBorderStatus(self.autoButton, "Some")
 
             if not inCombat then
-                local gKnown = (gSpellId and gSpellId > 0) and Buffadin:IsSpellKnown(gSpellId)
-                local leftSpellName = (gKnown and gSpellId > 0) and Buffadin:GetSpellName(gSpellId) or ((nSpellId and nSpellId > 0) and Buffadin:GetSpellName(nSpellId) or "")
-                local rightSpellName = (nSpellId and nSpellId > 0) and Buffadin:GetSpellName(nSpellId) or leftSpellName
-
-                -- Left Click: Greater (or Normal if unlearned)
-                if leftSpellName ~= "" then
-                    self.autoButton:SetAttribute("type1", "spell")
-                    self.autoButton:SetAttribute("spell1", leftSpellName)
-                    self.autoButton:SetAttribute("unit1", targetUnit)
-                else
+                local isMock = Buffadin.MockHarness and Buffadin.MockHarness.active
+                if isMock then
                     self.autoButton:SetAttribute("type1", nil)
-                end
-
-                -- Right Click: Always Normal Blessing
-                if rightSpellName ~= "" then
-                    self.autoButton:SetAttribute("type2", "spell")
-                    self.autoButton:SetAttribute("spell2", rightSpellName)
-                    self.autoButton:SetAttribute("unit2", targetUnit)
-                else
                     self.autoButton:SetAttribute("type2", nil)
+                else
+                    local gKnown = (gSpellId and gSpellId > 0) and Buffadin:IsSpellKnown(gSpellId)
+                    local leftSpellName = (gKnown and gSpellId > 0) and Buffadin:GetSpellName(gSpellId) or ((nSpellId and nSpellId > 0) and Buffadin:GetSpellName(nSpellId) or "")
+                    local rightSpellName = (nSpellId and nSpellId > 0) and Buffadin:GetSpellName(nSpellId) or leftSpellName
+
+                    -- Left Click: Greater (or Normal if unlearned)
+                    if leftSpellName ~= "" then
+                        self.autoButton:SetAttribute("type1", "spell")
+                        self.autoButton:SetAttribute("spell1", leftSpellName)
+                        self.autoButton:SetAttribute("unit1", targetUnit)
+                    else
+                        self.autoButton:SetAttribute("type1", nil)
+                    end
+
+                    -- Right Click: Always Normal Blessing
+                    if rightSpellName ~= "" then
+                        self.autoButton:SetAttribute("type2", "spell")
+                        self.autoButton:SetAttribute("spell2", rightSpellName)
+                        self.autoButton:SetAttribute("unit2", targetUnit)
+                    else
+                        self.autoButton:SetAttribute("type2", nil)
+                    end
                 end
             end
         else
@@ -499,10 +511,15 @@ function Bar:RefreshDisplay()
             local hasAura = Buffadin.BuffScanner.selfStatus.hasAura
             Buffadin.Theme:SetBorderStatus(self.auraButton, hasAura and "Good" or "All")
             if not inCombat then
-                local aName = Buffadin:GetSpellName(aInfo.spellId)
-                self.auraButton:SetAttribute("type", "spell")
-                self.auraButton:SetAttribute("spell", aName)
-                self.auraButton:SetAttribute("unit", "player")
+                local isMock = Buffadin.MockHarness and Buffadin.MockHarness.active
+                if isMock then
+                    self.auraButton:SetAttribute("type", nil)
+                else
+                    local aName = Buffadin:GetSpellName(aInfo.spellId)
+                    self.auraButton:SetAttribute("type", "spell")
+                    self.auraButton:SetAttribute("spell", aName)
+                    self.auraButton:SetAttribute("unit", "player")
+                end
             end
         else
             self.auraButton.icon:SetTexture(Buffadin.AURAS[0].icon)
@@ -518,10 +535,15 @@ function Bar:RefreshDisplay()
         local hasRF = Buffadin.BuffScanner.selfStatus.hasRighteousFury
         Buffadin.Theme:SetBorderStatus(self.rfButton, hasRF and "Good" or "Disabled")
         if not inCombat then
-            local rfName = Buffadin:GetSpellName(Buffadin.RIGHTEOUS_FURY.spellId)
-            self.rfButton:SetAttribute("type", "spell")
-            self.rfButton:SetAttribute("spell", rfName)
-            self.rfButton:SetAttribute("unit", "player")
+            local isMock = Buffadin.MockHarness and Buffadin.MockHarness.active
+            if isMock then
+                self.rfButton:SetAttribute("type", nil)
+            else
+                local rfName = Buffadin:GetSpellName(Buffadin.RIGHTEOUS_FURY.spellId)
+                self.rfButton:SetAttribute("type", "spell")
+                self.rfButton:SetAttribute("spell", rfName)
+                self.rfButton:SetAttribute("unit", "player")
+            end
         end
     end
 end

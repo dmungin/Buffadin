@@ -66,6 +66,11 @@ end
 function Buffadin:IsSpellKnown(spellID)
     if not spellID or spellID == 0 then return false end
 
+    -- Mock Harness override: treat all Paladin spells as known when mock mode is active
+    if Buffadin.MockHarness and Buffadin.MockHarness.active then
+        return true
+    end
+
     if C_Spell and C_Spell.IsSpellKnown then
         if C_Spell.IsSpellKnown(spellID) then return true end
     end
@@ -93,6 +98,11 @@ end
 -- =========================================================================
 
 function Buffadin:IsUnitInRange(unit, spellID, spellName)
+    -- Mock Harness override: mock units are always considered in range
+    if Buffadin.MockHarness and Buffadin.MockHarness.active then
+        return true
+    end
+
     if not unit or not UnitExists(unit) or not UnitIsConnected(unit) or UnitIsDeadOrGhost(unit) then
         return false
     end
@@ -194,6 +204,14 @@ function Buffadin:GetUnitBuffs(unit)
 end
 
 function Buffadin:FindUnitBuff(unit, targetSpellID, targetSpellName)
+    -- Mock Harness override: return mock buff state if active
+    if Buffadin.MockHarness and Buffadin.MockHarness.active and Buffadin.MockHarness.buffStates then
+        local state = Buffadin.MockHarness.buffStates[unit]
+        if state then
+            return state.hasBuff or false, state.expires or 0, state.duration or 0
+        end
+    end
+
     if not unit or not UnitExists(unit) then return false, 0, 0 end
 
     -- Check modern C_UnitAuras.GetPlayerAuraBySpellID if on player

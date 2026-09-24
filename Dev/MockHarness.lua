@@ -7,6 +7,9 @@ Mock.active = false
 Mock.currentPreset = "SOLO"
 Mock.simulatedCombat = false
 Mock.buffStates = {} -- [unitId] = { hasBuff = bool, expires = timestamp, duration = number }
+Mock.eventLog = {}   -- array of { timestamp, category, spell, target, details, formatted }
+Mock.hasAura = true
+Mock.hasRighteousFury = false
 
 -- =========================================================================
 -- Synthetic Roster Definitions
@@ -175,24 +178,24 @@ function Mock:InjectMockRoster(rosterData)
         Buffadin.Roster.classes[cls.id] = {}
     end
 
+    local now = GetTime()
     for _, u in ipairs(rosterData.units) do
         Buffadin.Roster.units[u.unitId] = u
         table.insert(Buffadin.Roster.classes[u.classId], u)
 
-        -- Initialize mock buff state if not present
         if not self.buffStates[u.unitId] then
             self.buffStates[u.unitId] = {
                 hasBuff = true,
-                expires = GetTime() + 900,
+                expires = now + 900,
                 duration = 900,
             }
         end
     end
 
-    for _, p in ipairs(rosterData.paladins) do
+    for i, p in ipairs(rosterData.paladins) do
         Buffadin.Roster.paladins[p.name] = {
             name = p.name,
-            unitId = p.isPlayer and "player" or "raid1",
+            unitId = p.isPlayer and "player" or ("raid" .. i),
             isPlayer = p.isPlayer,
             isLeader = p.isLeader,
             isAssist = p.isAssist,
@@ -207,6 +210,20 @@ function Mock:InjectMockRoster(rosterData)
         table.insert(Buffadin.Roster.sortedPaladins, p.name)
         Buffadin.Assignments:EnsurePaladin(p.name)
     end
+end
+
+function Mock:InitializeBuffStates()
+    self.buffStates = {}
+    local now = GetTime()
+    for _, u in pairs(Buffadin.Roster.units) do
+        self.buffStates[u.unitId] = {
+            hasBuff = true,
+            expires = now + 900,
+            duration = 900,
+        }
+    end
+    self.hasAura = true
+    self.hasRighteousFury = false
 end
 
 function Mock:ScanMockBuffs()
@@ -303,13 +320,363 @@ function Mock:ScanMockBuffs()
     end
 
     Buffadin.BuffScanner.selfStatus = {
-        hasAura = true,
+        hasAura = (self.hasAura ~= false),
         auraSpellId = 465,
-        hasRighteousFury = false,
+        hasRighteousFury = (self.hasRighteousFury == true),
         hasSeal = true,
         sealName = "Seal of Righteousness",
     }
 end
+
+-- =========================================================================
+-- Event Log System
+-- =========================================================================
+
+function Mock:LogEvent(category, spellName, targetText, details)
+    local timestamp = date("%H:%M:%S")
+    local categoryColors = {
+        ["AUTO"]    = "|cff00ff00[AUTO]|r",
+        ["CLASS"]   = "|cff00ccff[CLASS]|r",
+        ["POPUP"]   = "|cffffaa00[POPUP]|r",
+        ["NORMAL"]  = "|cffffee88[NORMAL]|r",
+        ["AURA"]    = "|cffF58CBA[AURA]|r",
+        ["SELF"]    = "|cffF58CBA[SELF]|r",
+        ["SYSTEM"]  = "|cffaaaaaa[SYSTEM]|r",
+        ["WARN"]    = "|cffff4444[WARN]|r",
+        ["INFO"]    = "|cff88ccff[INFO]|r",
+    }
+    local catTag = categoryColors[category] or string.format("|cffaaaaaa[%s]|r", category or "LOG")
+    local spellTag = spellName and string.format("|cffF58CBA%s|r", spellName) or ""
+    local targetTag = targetText and string.format("|cffffffff%s|r", targetText) or ""
+    local detailsTag = (details and details ~= "") and string.format(" |cff888888(%s)|r", details) or ""
+
+    local logLine = string.format("|cff888888[%s]|r %s %s -> %s%s",
+        timestamp, catTag, spellTag, targetTag, detailsTag)
+
+    table.insert(self.eventLog, {
+        timestamp = timestamp,
+        category = category,
+        spell = spellName,
+        target = targetText,
+        details = details,
+        formatted = logLine,
+    })
+
+    if self.logMessageFrame then
+        self.logMessageFrame:AddMessage(logLine)
+    end
+end
+
+function Mock:ClearLog()
+    self.eventLog = {}
+    if self.logMessageFrame then
+        self.logMessageFrame:Clear()
+    end
+    self:LogEvent("SYSTEM", "Buffadin Test Harness", "Event Log Cleared", "Click buttons to simulate actions")
+end
+
+-- =========================================================================
+-- Button Hooking & Click Interception
+-- =========================================================================
+
+function Mock:HookButton(btn, handler)
+    if not btn or btn._buffadinMockHooked then return end
+    btn._buffadinMockHooked = true
+
+    btn:HookScript("PreClick", function(self, button, down)
+        if not (Buffadin.MockHarness and Buffadin.MockHarness.active) then
+            return
+        end
+        local useKeyDown = (GetCVarBool and GetCVarBool("ActionButtonUseKeyDown")) or false
+        if down ~= nil and down ~= useKeyDown then
+            return
+        end
+        handler(self, button)
+    end)
+end
+
+function Mock:HookPopupButton(btn)
+    self:HookButton(btn, function(bSelf, button)
+        Mock:CastPlayerPopup(bSelf)
+    end)
+end
+
+function Mock:HookInteractiveButtons()
+    -- 1. Class Buttons
+    if Buffadin.BlessingsBar and Buffadin.BlessingsBar.buttons then
+        for _, btn in pairs(Buffadin.BlessingsBar.buttons) do
+            self:HookButton(btn, function(bSelf, button)
+                if button == "LeftButton" then
+                    Mock:CastClassBlessing(bSelf.classId, true)
+                elseif button == "RightButton" then
+                    Mock:CastClassBlessing(bSelf.classId, false)
+                end
+            end)
+        end
+    end
+
+    -- 2. Auto-Buff Button
+    if Buffadin.BlessingsBar and Buffadin.BlessingsBar.autoButton then
+        self:HookButton(Buffadin.BlessingsBar.autoButton, function(bSelf, button)
+            if button == "LeftButton" then
+                Mock:CastAutoBuff(true)
+            elseif button == "RightButton" then
+                Mock:CastAutoBuff(false)
+            end
+        end)
+    end
+
+    -- 3. Aura Button
+    if Buffadin.BlessingsBar and Buffadin.BlessingsBar.auraButton then
+        self:HookButton(Buffadin.BlessingsBar.auraButton, function(bSelf, button)
+            Mock:ToggleMockAura()
+        end)
+    end
+
+    -- 4. Righteous Fury Button
+    if Buffadin.BlessingsBar and Buffadin.BlessingsBar.rfButton then
+        self:HookButton(Buffadin.BlessingsBar.rfButton, function(bSelf, button)
+            Mock:ToggleMockRighteousFury()
+        end)
+    end
+
+    -- 5. Player Popup Rows
+    if Buffadin.PlayerPopups then
+        if Buffadin.PlayerPopups.buttons then
+            for _, btn in ipairs(Buffadin.PlayerPopups.buttons) do
+                self:HookPopupButton(btn)
+            end
+        end
+        if not self.origGetOrCreateButton then
+            self.origGetOrCreateButton = Buffadin.PlayerPopups.GetOrCreateButton
+            Buffadin.PlayerPopups.GetOrCreateButton = function(pSelf, index)
+                local btn = Mock.origGetOrCreateButton(pSelf, index)
+                Mock:HookPopupButton(btn)
+                return btn
+            end
+        end
+    end
+end
+
+-- =========================================================================
+-- Simulated Cast Actions
+-- =========================================================================
+
+function Mock:CastClassBlessing(classId, isGreater, category, customReason)
+    local pName = UnitName("player") or "Player"
+    local cls = Buffadin.CLASS_BY_ID[classId]
+    local clsName = cls and cls.name or ("Class " .. tostring(classId))
+    local gIndex = Buffadin.Assignments:GetGreater(pName, classId)
+
+    if not gIndex or gIndex == 0 then
+        self:LogEvent("WARN", "No Assignment", clsName, "No blessing assigned to " .. clsName)
+        return
+    end
+
+    local now = GetTime()
+    local classUnits = Buffadin.Roster.classes[classId] or {}
+
+    if isGreater then
+        local gConfig = Buffadin.GREATER_BLESSINGS[gIndex]
+        local spellName = gConfig and gConfig.name or "Greater Blessing"
+
+        local buffedPlayers = {}
+        local skippedOverrides = {}
+
+        for _, u in ipairs(classUnits) do
+            local nIndex = Buffadin.Assignments:GetNormal(pName, classId, u.name)
+            if nIndex and nIndex > 0 then
+                table.insert(skippedOverrides, u.name)
+            else
+                self.buffStates[u.unitId] = {
+                    hasBuff = true,
+                    expires = now + 900,
+                    duration = 900,
+                }
+                table.insert(buffedPlayers, u.name)
+            end
+        end
+
+        local countStr = string.format("%d player%s", #buffedPlayers, #buffedPlayers == 1 and "" or "s")
+        local details = countStr
+        if #buffedPlayers > 0 then
+            details = details .. ": " .. table.concat(buffedPlayers, ", ")
+        end
+        if #skippedOverrides > 0 then
+            details = details .. " (Skipped: " .. table.concat(skippedOverrides, ", ") .. " has override)"
+        end
+        if customReason and customReason ~= "" then
+            details = details .. " [" .. customReason .. "]"
+        end
+
+        self:LogEvent(category or "CLASS", spellName, clsName, details)
+    else
+        -- Right-click: Normal Blessing on next unit
+        local nIndex = Buffadin.GREATER_TO_NORMAL[gIndex] or 1
+        local nConfig = Buffadin.NORMAL_BLESSINGS[nIndex]
+        local spellName = nConfig and nConfig.name or "Normal Blessing"
+
+        local targetUnit = nil
+        local lowestExp = 999999
+
+        for _, u in ipairs(classUnits) do
+            local state = self.buffStates[u.unitId]
+            if not state or not state.hasBuff then
+                targetUnit = u
+                break
+            elseif state.expires and state.expires < lowestExp then
+                lowestExp = state.expires
+                targetUnit = u
+            end
+        end
+
+        if not targetUnit and #classUnits > 0 then
+            targetUnit = classUnits[1]
+        end
+
+        if targetUnit then
+            self.buffStates[targetUnit.unitId] = {
+                hasBuff = true,
+                expires = now + 900,
+                duration = 900,
+            }
+            local targetDesc = targetUnit.name .. (targetUnit.isTank and " [Tank]" or "")
+            self:LogEvent(category or "NORMAL", spellName, targetDesc, customReason or "Single Normal Blessing")
+        else
+            self:LogEvent("WARN", spellName, clsName, "No alive units found")
+        end
+    end
+
+    Buffadin.BuffScanner:Scan()
+    Buffadin.BlessingsBar:RefreshDisplay()
+    if Buffadin.PlayerPopups and Buffadin.PlayerPopups:IsShown() and Buffadin.PlayerPopups.currentClassId == classId then
+        Buffadin.PlayerPopups:ShowForClass(classId, Buffadin.BlessingsBar.buttons[classId])
+    end
+end
+
+function Mock:CastAutoBuff(isGreater)
+    local targetUnit, gSpellId, nSpellId, isGreaterAuto, bestClassId, reasonText = Buffadin.BuffScanner:GetNextAutoBuff()
+
+    if not targetUnit then
+        self:LogEvent("INFO", "Auto-Buff", "Raid", "All blessings and auras are currently active!")
+        return
+    end
+
+    local pName = UnitName("player") or "Player"
+
+    -- 1. Self Aura
+    if bestClassId == 0 and targetUnit == "player" then
+        local auraIndex = Buffadin.Assignments:GetAura(pName)
+        local aConfig = Buffadin.AURAS[auraIndex]
+        local aName = aConfig and aConfig.name or "Paladin Aura"
+        self.hasAura = true
+        self:LogEvent("AUTO", aName, "Player", reasonText or "Activated Assigned Aura")
+        Buffadin.BuffScanner:Scan()
+        Buffadin.BlessingsBar:RefreshDisplay()
+        return
+    end
+
+    -- 2. Class Greater Blessing
+    if isGreaterAuto and bestClassId and bestClassId > 0 then
+        self:CastClassBlessing(bestClassId, isGreater, "AUTO", reasonText)
+        return
+    end
+
+    -- 3. Single target unit (override, normal blessing, expiring)
+    local now = GetTime()
+    self.buffStates[targetUnit] = {
+        hasBuff = true,
+        expires = now + 900,
+        duration = 900,
+    }
+
+    local uInfo = Buffadin.Roster.units[targetUnit]
+    local sId = (nSpellId and nSpellId > 0) and nSpellId or (gSpellId or 0)
+    local sName = Buffadin:GetSpellName(sId)
+    if not sName or sName == "" then
+        local gIndex = Buffadin.Assignments:GetGreater(pName, uInfo and uInfo.classId or 1)
+        local nIndex = Buffadin.GREATER_TO_NORMAL[gIndex] or 1
+        local nCfg = Buffadin.NORMAL_BLESSINGS[nIndex]
+        sName = nCfg and nCfg.name or "Blessing"
+    end
+
+    local targetDesc = (uInfo and uInfo.name or targetUnit) .. ((uInfo and uInfo.isTank) and " [Tank]" or "")
+    self:LogEvent("AUTO", sName, targetDesc, reasonText or "Single Target Blessing")
+
+    Buffadin.BuffScanner:Scan()
+    Buffadin.BlessingsBar:RefreshDisplay()
+    if Buffadin.PlayerPopups and Buffadin.PlayerPopups:IsShown() and uInfo and uInfo.classId == Buffadin.PlayerPopups.currentClassId then
+        Buffadin.PlayerPopups:ShowForClass(uInfo.classId, Buffadin.PlayerPopups.currentAnchor)
+    end
+end
+
+function Mock:CastPlayerPopup(btn)
+    local u = btn.unitInfo
+    if not u then return end
+
+    local pName = UnitName("player") or "Player"
+    local now = GetTime()
+    local nIndex = Buffadin.Assignments:GetNormal(pName, u.classId, u.name)
+    local spellName = ""
+    local reason = ""
+
+    if nIndex and nIndex > 0 and Buffadin.NORMAL_BLESSINGS[nIndex] then
+        spellName = Buffadin.NORMAL_BLESSINGS[nIndex].name
+        reason = u.isTank and "Tank Override Blessing" or "Player Override Blessing"
+    else
+        local gIndex = Buffadin.Assignments:GetGreater(pName, u.classId)
+        local nEquiv = Buffadin.GREATER_TO_NORMAL[gIndex] or 1
+        local nConfig = Buffadin.NORMAL_BLESSINGS[nEquiv]
+        spellName = nConfig and nConfig.name or "Blessing"
+        reason = "Direct Player Blessing"
+    end
+
+    self.buffStates[u.unitId] = {
+        hasBuff = true,
+        expires = now + 900,
+        duration = 900,
+    }
+
+    local targetDesc = u.name .. (u.isTank and " [Tank]" or "")
+    self:LogEvent("POPUP", spellName, targetDesc, reason)
+
+    Buffadin.BuffScanner:Scan()
+    Buffadin.BlessingsBar:RefreshDisplay()
+    if Buffadin.PlayerPopups and Buffadin.PlayerPopups:IsShown() and Buffadin.PlayerPopups.currentClassId == u.classId then
+        Buffadin.PlayerPopups:ShowForClass(u.classId, Buffadin.PlayerPopups.currentAnchor)
+    end
+end
+
+function Mock:ToggleMockAura()
+    local pName = UnitName("player") or "Player"
+    local aIndex = Buffadin.Assignments:GetAura(pName)
+    local aConfig = Buffadin.AURAS[aIndex]
+    local aName = aConfig and aConfig.name or "Paladin Aura"
+
+    self.hasAura = not self.hasAura
+    Buffadin.BuffScanner.selfStatus.hasAura = self.hasAura
+    self:LogEvent("AURA", aName, "Player", self.hasAura and "Aura Activated" or "Aura Deactivated")
+
+    Buffadin.BuffScanner:Scan()
+    Buffadin.BlessingsBar:RefreshDisplay()
+end
+
+function Mock:ToggleMockRighteousFury()
+    self.hasRighteousFury = not self.hasRighteousFury
+    Buffadin.BuffScanner.selfStatus.hasRighteousFury = self.hasRighteousFury
+    self:LogEvent("SELF", "Righteous Fury", "Player", self.hasRighteousFury and "Activated" or "Cancelled")
+
+    Buffadin.BuffScanner:Scan()
+    Buffadin.BlessingsBar:RefreshDisplay()
+end
+
+function Mock:SimulateCast()
+    self:CastAutoBuff(true)
+end
+
+-- =========================================================================
+-- Harness Lifecycle (Enable / Disable / Preset)
+-- =========================================================================
 
 function Mock:Enable(preset)
     if not self.origRosterUpdate then
@@ -360,15 +727,20 @@ function Mock:Enable(preset)
         return Mock.origCanEdit(rSelf)
     end
 
+    -- Hook addon buttons for direct click simulation
+    self:HookInteractiveButtons()
+
     -- Pre-populate mock assignments if empty
     self:ApplyDefaultAssignments()
 
-    -- Trigger update
+    -- Trigger initial state update
     Buffadin.Roster:Update()
+    self:InitializeBuffStates()
     Buffadin.BuffScanner:Scan()
     Buffadin.BlessingsBar:UpdateLayout()
     Buffadin.ManagerFrame:UpdateGrid()
 
+    self:LogEvent("SYSTEM", "Test Harness", self.currentPreset, string.format("Mock environment active (%d units)", Buffadin.Roster.totalCount or 0))
     Buffadin:Print(string.format("Mock Test Harness active: |cff00ff00%s|r mode loaded.", self.currentPreset))
     self:UpdatePanelStatus()
 end
@@ -386,18 +758,30 @@ function Mock:Disable()
     if self.origInCombat then Buffadin.InCombat = self.origInCombat end
     if self.origCanEdit then Buffadin.Roster.CanEditAssignments = self.origCanEdit end
 
-    -- Restore real state
+    -- Restore real state and live secure casting attributes
     Buffadin.Roster:Update()
     Buffadin.BuffScanner:Scan()
     Buffadin.BlessingsBar:UpdateLayout()
     Buffadin.ManagerFrame:UpdateGrid()
 
+    self:LogEvent("SYSTEM", "Live Mode", "Solo/Real Group", "Restored live secure casting")
     Buffadin:Print("Mock Test Harness |cffff4444disabled|r. Reverted to live game state.")
     self:UpdatePanelStatus()
 end
 
 function Mock:SetPreset(preset)
-    self:Enable(preset)
+    if not self.active then
+        self:Enable(preset)
+    else
+        self.currentPreset = preset or "RAID40"
+        Buffadin.Roster:Update()
+        self:InitializeBuffStates()
+        Buffadin.BuffScanner:Scan()
+        Buffadin.BlessingsBar:UpdateLayout()
+        Buffadin.ManagerFrame:UpdateGrid()
+        self:LogEvent("SYSTEM", "Preset Changed", preset, string.format("Switched to %s mode (%d units)", preset, Buffadin.Roster.totalCount or 0))
+        self:UpdatePanelStatus()
+    end
 end
 
 -- =========================================================================
@@ -447,20 +831,24 @@ end
 function Mock:BuffAll(duration)
     duration = duration or 900
     local now = GetTime()
+    local count = 0
     for _, u in pairs(Buffadin.Roster.units) do
         self.buffStates[u.unitId] = {
             hasBuff = true,
             expires = now + duration,
             duration = duration,
         }
+        count = count + 1
     end
     Buffadin.BuffScanner:Scan()
     Buffadin.BlessingsBar:RefreshDisplay()
-    Buffadin:Print("Mock: Applied 15-minute buffs to all members.")
+    self:LogEvent("SYSTEM", "Buff All", "All Members", string.format("Set 15m duration on %d units", count))
+    Buffadin:Print(string.format("Mock: Applied 15-minute buffs to %d members.", count))
 end
 
 function Mock:SetRandomMissing()
     local count = 0
+    local droppedNames = {}
     for _, u in pairs(Buffadin.Roster.units) do
         if u.classId == 1 or u.classId == 7 or math.random() > 0.65 then
             self.buffStates[u.unitId] = {
@@ -469,10 +857,15 @@ function Mock:SetRandomMissing()
                 duration = 0,
             }
             count = count + 1
+            if #droppedNames < 6 then
+                table.insert(droppedNames, u.name)
+            end
         end
     end
     Buffadin.BuffScanner:Scan()
     Buffadin.BlessingsBar:RefreshDisplay()
+    local detail = string.format("Dropped on %d players (%s...)", count, table.concat(droppedNames, ", "))
+    self:LogEvent("WARN", "Random Missing", "Raid", detail)
     Buffadin:Print(string.format("Mock: Dropped buffs on %d players (check red missing counts).", count))
 end
 
@@ -495,6 +888,7 @@ function Mock:SetExpiring()
     end
     Buffadin.BuffScanner:Scan()
     Buffadin.BlessingsBar:RefreshDisplay()
+    self:LogEvent("WARN", "Expiring Buffs", "Rogues & Hunters", "Set Rogues (<45s) and Hunters (<110s)")
     Buffadin:Print("Mock: Set Rogues (45s) and Hunters (110s) as expiring.")
 end
 
@@ -504,9 +898,11 @@ function Mock:ToggleTankOverride()
 
     if current == 6 then
         Buffadin.Assignments:SetNormal(pallyName, 1, "Gorok", 0)
+        self:LogEvent("SYSTEM", "Tank Override", "Gorok (Warrior)", "Cleared override (reverted to Might)")
         Buffadin:Print("Mock: Cleared Tank override on Gorok (reset to class default).")
     else
         Buffadin.Assignments:SetNormal(pallyName, 1, "Gorok", 6) -- Sanctuary = 6
+        self:LogEvent("SYSTEM", "Tank Override", "Gorok (Warrior)", "Set override to [Blessing of Sanctuary]")
         Buffadin:Print("Mock: Set Gorok (Tank) override to [Blessing of Sanctuary]!")
     end
 
@@ -517,54 +913,17 @@ function Mock:ToggleTankOverride()
     end
 end
 
-function Mock:SimulateCast()
-    local targetUnit, gSpellId, nSpellId, isGreater, classId, reason = Buffadin.BuffScanner:GetNextAutoBuff()
-
-    if not targetUnit then
-        Buffadin:Print("Mock: All buffs are active! No auto-buff target needed.")
-        return
-    end
-
-    local now = GetTime()
-    if isGreater and classId then
-        -- Refresh all units of this class
-        local units = Buffadin.Roster.classes[classId] or {}
-        for _, u in ipairs(units) do
-            local uStatus = Buffadin.BuffScanner.unitStatus[u.unitId]
-            if not uStatus or not uStatus.isSpecial then
-                self.buffStates[u.unitId] = {
-                    hasBuff = true,
-                    expires = now + 900,
-                    duration = 900,
-                }
-            end
-        end
-        local cls = Buffadin.CLASS_BY_ID[classId]
-        Buffadin:Print(string.format("Mock: Simulated Greater Blessing cast on %s class! (Reason: %s)", cls and cls.name or "Class", reason or ""))
-    else
-        -- Single target override
-        self.buffStates[targetUnit] = {
-            hasBuff = true,
-            expires = now + 900,
-            duration = 900,
-        }
-        local uInfo = Buffadin.Roster.units[targetUnit]
-        Buffadin:Print(string.format("Mock: Simulated single-target Blessing on %s! (Reason: %s)", uInfo and uInfo.name or targetUnit, reason or ""))
-    end
-
-    Buffadin.BuffScanner:Scan()
-    Buffadin.BlessingsBar:RefreshDisplay()
-end
-
 function Mock:ToggleCombat()
     self.simulatedCombat = not self.simulatedCombat
 
     if self.simulatedCombat then
+        self:LogEvent("WARN", "Combat State", "In Combat", "Simulated COMBAT START")
         Buffadin:Print("Mock: Simulated |cffff4444COMBAT START|r (checking combat lockdown handling).")
         if Buffadin.db and Buffadin.db.profile.hideInCombat then
             Buffadin.BlessingsBar:Hide()
         end
     else
+        self:LogEvent("INFO", "Combat State", "Out of Combat", "Simulated COMBAT END")
         Buffadin:Print("Mock: Simulated |cff00ff00COMBAT END|r (processing queued changes).")
         Buffadin:ProcessCombatQueue()
         Buffadin.BlessingsBar:UpdateLayout()
@@ -582,8 +941,8 @@ function Mock:CreateControlPanel()
     if self.panel then return self.panel end
 
     local panel = CreateFrame("Frame", "Buffadin_MockControlPanel", UIParent, "BackdropTemplate")
-    panel:SetSize(340, 240)
-    panel:SetPoint("CENTER", UIParent, "CENTER", 200, 0)
+    panel:SetSize(480, 450)
+    panel:SetPoint("CENTER", UIParent, "CENTER", 180, 0)
     panel:SetFrameStrata("DIALOG")
     panel:SetMovable(true)
     panel:EnableMouse(true)
@@ -597,7 +956,7 @@ function Mock:CreateControlPanel()
     -- Title
     local title = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightMedium")
     title:SetPoint("TOPLEFT", 14, -12)
-    title:SetText("|cffF58CBABuffadin|r Dev Test Harness")
+    title:SetText("|cffF58CBABuffadin|r Dev Test Harness & Event Log")
 
     local closeBtn = CreateFrame("Button", nil, panel, "UIPanelCloseButton")
     closeBtn:SetPoint("TOPRIGHT", -4, -4)
@@ -605,85 +964,145 @@ function Mock:CreateControlPanel()
 
     -- Status Text
     local statusText = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    statusText:SetPoint("TOPLEFT", 14, -36)
+    statusText:SetPoint("TOPLEFT", 14, -34)
     statusText:SetTextColor(0.8, 0.8, 0.8)
     panel.statusText = statusText
 
     -- Section 1: Presets
     local lblPresets = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    lblPresets:SetPoint("TOPLEFT", 14, -58)
+    lblPresets:SetPoint("TOPLEFT", 14, -54)
     lblPresets:SetText("Roster Environments:")
 
     local btnParty = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-    btnParty:SetSize(72, 22)
-    btnParty:SetPoint("TOPLEFT", 14, -76)
+    btnParty:SetSize(80, 22)
+    btnParty:SetPoint("TOPLEFT", 14, -72)
     Buffadin.Theme:StyleButton(btnParty, "Party (5)")
     btnParty:SetScript("OnClick", function() Mock:SetPreset("PARTY") end)
 
     local btnRaid25 = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-    btnRaid25:SetSize(72, 22)
+    btnRaid25:SetSize(80, 22)
     btnRaid25:SetPoint("LEFT", btnParty, "RIGHT", 6, 0)
     Buffadin.Theme:StyleButton(btnRaid25, "Raid (25)")
     btnRaid25:SetScript("OnClick", function() Mock:SetPreset("RAID25") end)
 
     local btnRaid40 = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-    btnRaid40:SetSize(72, 22)
+    btnRaid40:SetSize(80, 22)
     btnRaid40:SetPoint("LEFT", btnRaid25, "RIGHT", 6, 0)
     Buffadin.Theme:StyleButton(btnRaid40, "Raid (40)")
     btnRaid40:SetScript("OnClick", function() Mock:SetPreset("RAID40") end)
 
     local btnLive = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-    btnLive:SetSize(72, 22)
+    btnLive:SetSize(80, 22)
     btnLive:SetPoint("LEFT", btnRaid40, "RIGHT", 6, 0)
     Buffadin.Theme:StyleButton(btnLive, "Live Mode")
     btnLive:SetScript("OnClick", function() Mock:Disable() end)
 
     -- Section 2: Buff States
     local lblBuffs = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    lblBuffs:SetPoint("TOPLEFT", 14, -108)
+    lblBuffs:SetPoint("TOPLEFT", 14, -102)
     lblBuffs:SetText("Buff Simulation:")
 
     local btnBuffAll = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-    btnBuffAll:SetSize(95, 22)
-    btnBuffAll:SetPoint("TOPLEFT", 14, -126)
+    btnBuffAll:SetSize(110, 22)
+    btnBuffAll:SetPoint("TOPLEFT", 14, -120)
     Buffadin.Theme:StyleButton(btnBuffAll, "Buff All (15m)")
     btnBuffAll:SetScript("OnClick", function() Mock:BuffAll(900) end)
 
     local btnMissing = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-    btnMissing:SetSize(100, 22)
+    btnMissing:SetSize(115, 22)
     btnMissing:SetPoint("LEFT", btnBuffAll, "RIGHT", 6, 0)
     Buffadin.Theme:StyleButton(btnMissing, "Random Missing")
     btnMissing:SetScript("OnClick", function() Mock:SetRandomMissing() end)
 
     local btnExpiring = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-    btnExpiring:SetSize(100, 22)
+    btnExpiring:SetSize(110, 22)
     btnExpiring:SetPoint("LEFT", btnMissing, "RIGHT", 6, 0)
     Buffadin.Theme:StyleButton(btnExpiring, "Expiring (<2m)")
     btnExpiring:SetScript("OnClick", function() Mock:SetExpiring() end)
 
-    -- Section 3: Tank Overrides & Cast Actions
+    -- Section 3: Actions & Overrides
     local lblActions = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    lblActions:SetPoint("TOPLEFT", 14, -158)
-    lblActions:SetText("Actions & Overrides:")
+    lblActions:SetPoint("TOPLEFT", 14, -150)
+    lblActions:SetText("Actions & Controls:")
 
     local btnTank = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-    btnTank:SetSize(115, 22)
-    btnTank:SetPoint("TOPLEFT", 14, -176)
+    btnTank:SetSize(125, 22)
+    btnTank:SetPoint("TOPLEFT", 14, -168)
     Buffadin.Theme:StyleButton(btnTank, "Tank Sanc Override")
     btnTank:SetScript("OnClick", function() Mock:ToggleTankOverride() end)
 
     local btnCast = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-    btnCast:SetSize(105, 22)
+    btnCast:SetSize(100, 22)
     btnCast:SetPoint("LEFT", btnTank, "RIGHT", 6, 0)
     Buffadin.Theme:StyleButton(btnCast, "Simulate Cast")
     btnCast:SetScript("OnClick", function() Mock:SimulateCast() end)
 
+    local btnAuraToggle = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+    btnAuraToggle:SetSize(85, 22)
+    btnAuraToggle:SetPoint("LEFT", btnCast, "RIGHT", 6, 0)
+    Buffadin.Theme:StyleButton(btnAuraToggle, "Toggle Aura")
+    btnAuraToggle:SetScript("OnClick", function() Mock:ToggleMockAura() end)
+
     local btnCombat = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-    btnCombat:SetSize(80, 22)
-    btnCombat:SetPoint("LEFT", btnCast, "RIGHT", 6, 0)
+    btnCombat:SetSize(85, 22)
+    btnCombat:SetPoint("LEFT", btnAuraToggle, "RIGHT", 6, 0)
     Buffadin.Theme:StyleButton(btnCombat, "Combat")
     btnCombat:SetScript("OnClick", function() Mock:ToggleCombat() end)
     panel.btnCombat = btnCombat
+
+    -- Section 4: Live Event Log
+    local lblLog = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    lblLog:SetPoint("TOPLEFT", 14, -198)
+    lblLog:SetText("Cast Event Log (Live):")
+
+    local btnClearLog = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+    btnClearLog:SetSize(72, 18)
+    btnClearLog:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -14, -196)
+    Buffadin.Theme:StyleButton(btnClearLog, "Clear Log")
+    btnClearLog:SetScript("OnClick", function() Mock:ClearLog() end)
+
+    local btnBottom = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+    btnBottom:SetSize(60, 18)
+    btnBottom:SetPoint("RIGHT", btnClearLog, "LEFT", -6, 0)
+    Buffadin.Theme:StyleButton(btnBottom, "Bottom")
+    btnBottom:SetScript("OnClick", function()
+        if Mock.logMessageFrame then
+            Mock.logMessageFrame:ScrollToBottom()
+        end
+    end)
+
+    local logContainer = CreateFrame("Frame", nil, panel, "BackdropTemplate")
+    logContainer:SetPoint("TOPLEFT", panel, "TOPLEFT", 14, -220)
+    logContainer:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -14, 14)
+    Buffadin.Theme:ApplyCardBackdrop(logContainer, 0.98, 0.90)
+
+    local logFrame = CreateFrame("ScrollingMessageFrame", "Buffadin_MockLogFrame", logContainer)
+    logFrame:SetPoint("TOPLEFT", logContainer, "TOPLEFT", 8, -6)
+    logFrame:SetPoint("BOTTOMRIGHT", logContainer, "BOTTOMRIGHT", -8, 6)
+    logFrame:SetFontObject("GameFontHighlightSmall")
+    logFrame:SetJustifyH("LEFT")
+    logFrame:SetFading(false)
+    logFrame:SetMaxLines(300)
+    logFrame:EnableMouseWheel(true)
+    logFrame:SetScript("OnMouseWheel", function(self, delta)
+        if delta > 0 then
+            self:ScrollUp()
+        else
+            self:ScrollDown()
+        end
+    end)
+
+    self.logMessageFrame = logFrame
+
+    -- Re-populate existing log entries if reopening
+    if #self.eventLog > 0 then
+        for _, entry in ipairs(self.eventLog) do
+            logFrame:AddMessage(entry.formatted)
+        end
+        logFrame:ScrollToBottom()
+    else
+        self:LogEvent("SYSTEM", "Buffadin Test Harness", "Event Log Ready", "Click buttons to simulate casts")
+    end
 
     self.panel = panel
     self:UpdatePanelStatus()
