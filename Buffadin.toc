@@ -1,4 +1,4 @@
-## Interface: 16001, 16000, 11500, 110000, 110002
+## Interface: 16001, 16000
 ## Title: |cffF58CBABuffadin|r
 ## Notes: Modern Paladin Blessing & Aura Manager for WoW: Forever
 ## Author: Buffadin Team
