@@ -7,6 +7,7 @@ Buffadin.BuffScanner = {
         hasAura = false,
         auraSpellId = 0,
         hasRighteousFury = false,
+        rfAbsExpiration = 0,
         hasSeal = false,
         sealName = "",
     }
@@ -27,6 +28,13 @@ end
 function Buffadin.BuffScanner:Scan()
     local playerName = UnitName("player")
     local currentTime = GetTime()
+
+    -- Modern WoW engines (like WoW: Forever) restrict or block querying unit auras (C_UnitAuras / UnitAura) during combat.
+    -- While in combat, maintain known aura and blessing states and countdown active expiration timers rather than re-querying blocked APIs.
+    if Buffadin:InCombat() and not (Buffadin.MockHarness and Buffadin.MockHarness.active) then
+        self:UpdateInCombat(playerName, currentTime)
+        return
+    end
 
     -- 1. Scan Class & Unit Blessings
     for classId, units in pairs(Buffadin.Roster.classes) do
@@ -84,14 +92,17 @@ function Buffadin.BuffScanner:Scan()
                 end
 
                 local remaining = 0
+                local absExp = 0
                 if hasBuff and expTime and expTime > 0 then
                     remaining = math.max(0, expTime - currentTime)
+                    absExp = expTime
                     if remaining < minExpiration then
                         minExpiration = remaining
                     end
                 elseif hasBuff then
                     -- Buff exists without expiration or long duration
                     remaining = duration or 900
+                    absExp = currentTime + remaining
                 end
 
                 if not hasBuff then
@@ -107,6 +118,7 @@ function Buffadin.BuffScanner:Scan()
                 self.unitStatus[unit] = {
                     hasBuff = hasBuff,
                     expiration = remaining,
+                    absExpiration = absExp,
                     assignedGSpellId = targetGSpellId,
                     assignedNSpellId = targetNSpellId,
                     assignedSpellName = (targetGSpellName ~= "") and targetGSpellName or targetNSpellName,
@@ -161,7 +173,9 @@ function Buffadin.BuffScanner:Scan()
     -- Righteous Fury
     local rfSpellId = Buffadin.RIGHTEOUS_FURY.spellId
     local rfName = Buffadin:GetSpellName(rfSpellId)
-    self.selfStatus.hasRighteousFury = Buffadin:FindUnitBuff("player", rfSpellId, rfName)
+    local hasRF, rfExp, rfDur = Buffadin:FindUnitBuff("player", rfSpellId, rfName)
+    self.selfStatus.hasRighteousFury = hasRF
+    self.selfStatus.rfAbsExpiration = (hasRF and rfExp and rfExp > 0) and rfExp or ((hasRF and rfDur) and (currentTime + rfDur) or (hasRF and (currentTime + 1800) or 0))
 
     -- Seals
     local hasSeal = false
@@ -179,6 +193,111 @@ function Buffadin.BuffScanner:Scan()
     end
     self.selfStatus.hasSeal = hasSeal
     self.selfStatus.sealName = sealName
+
+    if Buffadin.OnBuffsScanned then
+        Buffadin:OnBuffsScanned()
+    end
+end
+
+-- =========================================================================
+-- Combat Aura State Maintenance (Countdown timers & death tracking without API queries)
+-- =========================================================================
+function Buffadin.BuffScanner:UpdateInCombat(playerName, currentTime)
+    -- 1. Update Class & Unit Blessings using cached status & countdown timers
+    for classId, units in pairs(Buffadin.Roster.classes) do
+        local gIndex = Buffadin.Assignments:GetGreater(playerName, classId)
+        local nEquivIndex = Buffadin.GREATER_TO_NORMAL[gIndex] or 0
+
+        local totalAlive = 0
+        local missingCount = 0
+        local classMissingCount = 0
+        local specialMissingCount = 0
+        local minExpiration = 99999
+        local hasSpecialMissing = false
+
+        for _, unitInfo in ipairs(units) do
+            local unit = unitInfo.unitId
+            local isDead = unitInfo.isDead or (UnitIsDeadOrGhost and UnitIsDeadOrGhost(unit))
+            if Buffadin:UnitExists(unit) and not isDead and unitInfo.isOnline then
+                totalAlive = totalAlive + 1
+
+                local uStatus = self.unitStatus[unit]
+                if uStatus then
+                    if isDead then
+                        uStatus.hasBuff = false
+                        uStatus.expiration = 0
+                    elseif uStatus.hasBuff then
+                        if uStatus.absExpiration and uStatus.absExpiration > 0 then
+                            local remaining = uStatus.absExpiration - currentTime
+                            if remaining <= 0 then
+                                uStatus.hasBuff = false
+                                uStatus.expiration = 0
+                            else
+                                uStatus.expiration = remaining
+                                if remaining < minExpiration then
+                                    minExpiration = remaining
+                                end
+                            end
+                        else
+                            if uStatus.expiration and uStatus.expiration > 0 and uStatus.expiration < minExpiration then
+                                minExpiration = uStatus.expiration
+                            end
+                        end
+                    end
+
+                    if not uStatus.hasBuff then
+                        missingCount = missingCount + 1
+                        if uStatus.isSpecial then
+                            hasSpecialMissing = true
+                            specialMissingCount = specialMissingCount + 1
+                        else
+                            classMissingCount = classMissingCount + 1
+                        end
+                    end
+                else
+                    missingCount = missingCount + 1
+                    classMissingCount = classMissingCount + 1
+                end
+            end
+        end
+
+        local status = "Disabled"
+        if gIndex == 0 and missingCount == 0 then
+            status = "Disabled"
+        elseif totalAlive == 0 then
+            status = "Disabled"
+        elseif missingCount == 0 then
+            status = "Good"
+        elseif classMissingCount == 0 and specialMissingCount > 0 then
+            status = "Special"
+        elseif missingCount == totalAlive then
+            status = "All"
+        elseif hasSpecialMissing then
+            status = "Special"
+        else
+            status = "Some"
+        end
+
+        self.classStatus[classId] = {
+            status = status,
+            missingCount = missingCount,
+            classMissingCount = classMissingCount,
+            specialMissingCount = specialMissingCount,
+            totalCount = totalAlive,
+            minExpiration = (minExpiration < 99999) and minExpiration or 0,
+            assignedGSpell = gIndex,
+            assignedNSpell = nEquivIndex,
+        }
+    end
+
+    -- 2. Maintain Paladin Self Auras & Righteous Fury
+    -- Stances like Paladin Auras are permanent and do not expire in combat.
+    -- Righteous Fury only expires if its timer ran out.
+    if self.selfStatus.hasRighteousFury and self.selfStatus.rfAbsExpiration and self.selfStatus.rfAbsExpiration > 0 then
+        if currentTime >= self.selfStatus.rfAbsExpiration then
+            self.selfStatus.hasRighteousFury = false
+        end
+    end
 
     if Buffadin.OnBuffsScanned then
         Buffadin:OnBuffsScanned()

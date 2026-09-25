@@ -250,8 +250,9 @@ Buffadin.EventFrame:SetScript("OnEvent", function(self, event, ...)
         end)
 
     elseif event == "PLAYER_REGEN_ENABLED" then
-        -- Exited combat: process deferred secure operations
+        -- Exited combat: process deferred secure operations and immediately run a live aura scan
         Buffadin:ProcessCombatQueue()
+        Buffadin.BuffScanner:Scan()
         Buffadin.BlessingsBar:UpdateLayout()
 
     elseif event == "PLAYER_REGEN_DISABLED" then

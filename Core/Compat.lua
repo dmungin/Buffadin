@@ -232,8 +232,8 @@ function Buffadin:FindUnitBuff(unit, targetSpellID, targetSpellName)
 
     -- Check modern C_UnitAuras.GetPlayerAuraBySpellID if on player
     if unit == "player" and targetSpellID and C_UnitAuras and C_UnitAuras.GetPlayerAuraBySpellID then
-        local aura = C_UnitAuras.GetPlayerAuraBySpellID(targetSpellID)
-        if aura then
+        local ok, aura = pcall(C_UnitAuras.GetPlayerAuraBySpellID, targetSpellID)
+        if ok and aura and not (issecretvalue and issecretvalue(aura)) then
             return true, aura.expirationTime or 0, aura.duration or 0
         end
     end
@@ -243,6 +243,14 @@ function Buffadin:FindUnitBuff(unit, targetSpellID, targetSpellName)
         if (targetSpellID and buff.spellId == targetSpellID) or
            (targetSpellName and buff.name and buff.name == targetSpellName) then
             return true, buff.expirationTime, buff.duration
+        end
+    end
+
+    -- If in combat and querying player/unit, check cached unitStatus as fallback
+    if self:InCombat() and self.BuffScanner and self.BuffScanner.unitStatus then
+        local uStatus = self.BuffScanner.unitStatus[unit]
+        if uStatus and uStatus.hasBuff then
+            return true, uStatus.absExpiration or 0, uStatus.expiration or 0
         end
     end
 
