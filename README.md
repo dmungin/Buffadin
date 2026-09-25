@@ -1,4 +1,5 @@
-<img width="150" height="150" alt="image" src="https://github.com/user-attachments/assets/4b2d31ac-559f-467b-86d8-f75f6a468494" />
+<img width="687" height="688" alt="image" src="https://github.com/user-attachments/assets/e2a049d0-b32f-470b-aa31-f7c6cc992dc0" />
+
 
 
 **Buffadin** is a modern Paladin blessing and aura manager built for **World of Warcraft: Forever**. It provides full assignment coordination, intuitive single-target overrides, and one-click buffing.
