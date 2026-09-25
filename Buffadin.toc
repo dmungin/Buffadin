@@ -2,7 +2,7 @@
 ## Title: |cffF58CBABuffadin|r
 ## Notes: Modern Paladin Blessing & Aura Manager for WoW: Forever
 ## Author: Buffadin Team
-## Version: 0.1.1
+## Version: 0.1.2
 ## SavedVariables: BuffadinDB
 ## LoadSavedVariablesFirst: 1
 ## IconTexture: Interface\Icons\Spell_Magic_GreaterBlessingofKings

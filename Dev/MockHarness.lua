@@ -748,17 +748,44 @@ function Mock:ToggleCombat()
         if Buffadin.db and Buffadin.db.profile.hideInCombat then
             Buffadin.BlessingsBar:Hide()
         end
+        Buffadin.BuffScanner:Scan()
         Buffadin.BlessingsBar:RefreshDisplay()
     else
         self:LogEvent("INFO", "Combat State", "Out of Combat", "Simulated COMBAT END")
         Buffadin:Print("Mock: Simulated |cff00ff00COMBAT END|r (processing queued changes).")
         Buffadin:ProcessCombatQueue()
+        Buffadin.BuffScanner:Scan()
         Buffadin.BlessingsBar:UpdateLayout()
         Buffadin.BlessingsBar:RefreshDisplay()
         Buffadin.ManagerFrame:UpdateGrid()
     end
 
     self:UpdatePanelStatus()
+end
+
+function Mock:SimulateDeath(unitId)
+    unitId = unitId or "raid5"
+    local u = self.mockUnits and self.mockUnits[unitId]
+    if u then
+        u.isDead = true
+        self:ClearUnitBuff(unitId)
+        Buffadin.BuffScanner:Scan()
+        Buffadin.BlessingsBar:RefreshDisplay()
+        self:LogEvent("WARN", "Unit Died", u.name, "Unit marked dead")
+        Buffadin:Print("Mock: " .. u.name .. " has died.")
+    end
+end
+
+function Mock:SimulateBattleRez(unitId)
+    unitId = unitId or "raid5"
+    local u = self.mockUnits and self.mockUnits[unitId]
+    if u then
+        u.isDead = false
+        Buffadin.BuffScanner:Scan()
+        Buffadin.BlessingsBar:RefreshDisplay()
+        self:LogEvent("INFO", "Battle Rez", u.name, "Unit resurrected without buffs")
+        Buffadin:Print("Mock: " .. u.name .. " was battle-rezzed (alive, missing buff).")
+    end
 end
 
 -- =========================================================================
