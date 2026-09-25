@@ -395,13 +395,46 @@ function Buffadin:GetUnitInfo(unit)
         isTank = (GetPartyAssignment("MAINTANK", unit) == true)
     end
 
-    local isDead = UnitIsDeadOrGhost(unit)
-    local isOnline = UnitIsConnected(unit)
+    local isDead = self:IsUnitDead(unit)
+    local isOnline = self:IsUnitConnected(unit)
     local isVisible = UnitIsVisible(unit)
     local isLeader = UnitIsGroupLeader(unit)
     local isAssist = UnitIsGroupAssistant(unit)
 
     return true, name, fullName, classToken, isTank, isDead, isOnline, isVisible, isLeader, isAssist
+end
+
+function Buffadin:IsUnitDead(unit)
+    if self.MockHarness and self.MockHarness.active then
+        local u = self.mockUnits and self.mockUnits[unit]
+        if not u and self.MockHarness.mockUnits then
+            u = self.MockHarness.mockUnits[unit]
+        end
+        return (u and u.isDead == true) or false
+    end
+    if not unit or not UnitExists(unit) then return false end
+    if UnitIsDeadOrGhost then
+        return UnitIsDeadOrGhost(unit) == true or UnitIsDeadOrGhost(unit) == 1
+    end
+    if UnitIsDead then
+        return UnitIsDead(unit) == true or UnitIsDead(unit) == 1
+    end
+    return false
+end
+
+function Buffadin:IsUnitConnected(unit)
+    if self.MockHarness and self.MockHarness.active then
+        local u = self.mockUnits and self.mockUnits[unit]
+        if not u and self.MockHarness.mockUnits then
+            u = self.MockHarness.mockUnits[unit]
+        end
+        return not u or u.isOnline ~= false
+    end
+    if not unit or not UnitExists(unit) then return false end
+    if UnitIsConnected then
+        return UnitIsConnected(unit) == true or UnitIsConnected(unit) == 1
+    end
+    return true
 end
 
 function Buffadin:IsUnitPlayer(unit)
@@ -424,5 +457,6 @@ function Buffadin:IsInGroup()
     end
     return IsInGroup()
 end
+
 
 

@@ -30,8 +30,7 @@ function Buffadin.BuffScanner:Scan()
     local currentTime = GetTime()
 
     -- Modern WoW engines (like WoW: Forever) restrict or block querying unit auras (C_UnitAuras / UnitAura) during combat.
-    -- While in combat, maintain known aura and blessing states and countdown active expiration timers rather than re-querying blocked APIs.
-    if Buffadin:InCombat() and not (Buffadin.MockHarness and Buffadin.MockHarness.active) then
+    if Buffadin:InCombat() then
         self:UpdateInCombat(playerName, currentTime)
         return
     end
@@ -57,25 +56,28 @@ function Buffadin.BuffScanner:Scan()
 
         for _, unitInfo in ipairs(units) do
             local unit = unitInfo.unitId
-            if Buffadin:UnitExists(unit) and not unitInfo.isDead and unitInfo.isOnline then
+            local isDead = Buffadin:IsUnitDead(unit)
+            local isOnline = Buffadin:IsUnitConnected(unit)
+
+            -- Check if this specific unit has a Normal Blessing override assigned
+            local nIndex = Buffadin.Assignments:GetNormal(playerName, classId, unitInfo.name)
+            local targetGSpellId = gSpellId
+            local targetGSpellName = gSpellName
+            local targetNSpellId = nEquivId
+            local targetNSpellName = nEquivName
+            local isSpecial = false
+
+            if nIndex and nIndex > 0 then
+                local nSpellConfig = Buffadin.NORMAL_BLESSINGS[nIndex]
+                targetNSpellId = nSpellConfig and nSpellConfig.spellId or 0
+                targetNSpellName = (targetNSpellId > 0) and Buffadin:GetSpellName(targetNSpellId) or ""
+                targetGSpellId = 0
+                targetGSpellName = ""
+                isSpecial = true
+            end
+
+            if Buffadin:UnitExists(unit) and not isDead and isOnline then
                 totalAlive = totalAlive + 1
-
-                -- Check if this specific unit has a Normal Blessing override assigned
-                local nIndex = Buffadin.Assignments:GetNormal(playerName, classId, unitInfo.name)
-                local targetGSpellId = gSpellId
-                local targetGSpellName = gSpellName
-                local targetNSpellId = nEquivId
-                local targetNSpellName = nEquivName
-                local isSpecial = false
-
-                if nIndex and nIndex > 0 then
-                    local nSpellConfig = Buffadin.NORMAL_BLESSINGS[nIndex]
-                    targetNSpellId = nSpellConfig and nSpellConfig.spellId or 0
-                    targetNSpellName = (targetNSpellId > 0) and Buffadin:GetSpellName(targetNSpellId) or ""
-                    targetGSpellId = 0
-                    targetGSpellName = ""
-                    isSpecial = true
-                end
 
                 local hasBuff = false
                 local expTime = 0
@@ -123,6 +125,19 @@ function Buffadin.BuffScanner:Scan()
                     assignedNSpellId = targetNSpellId,
                     assignedSpellName = (targetGSpellName ~= "") and targetGSpellName or targetNSpellName,
                     isSpecial = isSpecial,
+                    diedInCombat = false,
+                }
+            elseif Buffadin:UnitExists(unit) then
+                -- Dead or offline unit: populate assignments but marked as unbuffed
+                self.unitStatus[unit] = {
+                    hasBuff = false,
+                    expiration = 0,
+                    absExpiration = 0,
+                    assignedGSpellId = targetGSpellId,
+                    assignedNSpellId = targetNSpellId,
+                    assignedSpellName = (targetGSpellName ~= "") and targetGSpellName or targetNSpellName,
+                    isSpecial = isSpecial,
+                    diedInCombat = isDead,
                 }
             end
         end
@@ -217,15 +232,30 @@ function Buffadin.BuffScanner:UpdateInCombat(playerName, currentTime)
 
         for _, unitInfo in ipairs(units) do
             local unit = unitInfo.unitId
-            local isDead = unitInfo.isDead or (UnitIsDeadOrGhost and UnitIsDeadOrGhost(unit))
-            if Buffadin:UnitExists(unit) and not isDead and unitInfo.isOnline then
+            local isDead = Buffadin:IsUnitDead(unit)
+            local isOnline = Buffadin:IsUnitConnected(unit)
+            local uStatus = self.unitStatus[unit]
+
+            if isDead then
+                -- Unit is dead: death strips all blessings and buffs
+                if uStatus then
+                    uStatus.hasBuff = false
+                    uStatus.expiration = 0
+                    uStatus.absExpiration = 0
+                    uStatus.diedInCombat = true
+                end
+                -- Dead units are excluded from totalAlive and missingCount
+            elseif Buffadin:UnitExists(unit) and isOnline then
+                -- Unit is alive and online
                 totalAlive = totalAlive + 1
 
-                local uStatus = self.unitStatus[unit]
                 if uStatus then
-                    if isDead then
+                    -- If unit died in combat and was battle rezzed, death stripped all buffs!
+                    -- They remain missing (hasBuff = false) until rebuffed or combat ends.
+                    if uStatus.diedInCombat then
                         uStatus.hasBuff = false
                         uStatus.expiration = 0
+                        uStatus.absExpiration = 0
                     elseif uStatus.hasBuff then
                         if uStatus.absExpiration and uStatus.absExpiration > 0 then
                             local remaining = uStatus.absExpiration - currentTime
@@ -291,11 +321,18 @@ function Buffadin.BuffScanner:UpdateInCombat(playerName, currentTime)
     end
 
     -- 2. Maintain Paladin Self Auras & Righteous Fury
-    -- Stances like Paladin Auras are permanent and do not expire in combat.
-    -- Righteous Fury only expires if its timer ran out.
-    if self.selfStatus.hasRighteousFury and self.selfStatus.rfAbsExpiration and self.selfStatus.rfAbsExpiration > 0 then
-        if currentTime >= self.selfStatus.rfAbsExpiration then
-            self.selfStatus.hasRighteousFury = false
+    if Buffadin:IsUnitDead("player") then
+        self.selfStatus.hasAura = false
+        self.selfStatus.hasRighteousFury = false
+        self.selfStatus.rfAbsExpiration = 0
+        self.selfStatus.hasSeal = false
+        self.selfStatus.sealName = ""
+    else
+        -- If paladin is alive, count down Righteous Fury timer
+        if self.selfStatus.hasRighteousFury and self.selfStatus.rfAbsExpiration and self.selfStatus.rfAbsExpiration > 0 then
+            if currentTime >= self.selfStatus.rfAbsExpiration then
+                self.selfStatus.hasRighteousFury = false
+            end
         end
     end
 

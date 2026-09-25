@@ -143,8 +143,10 @@ function Popups:GetOrCreateButton(index)
             local uStatus = Buffadin.BuffScanner.unitStatus[self.unitInfo.unitId]
             if uStatus then
                 local bName = uStatus.assignedSpellName or "None"
-                GameTooltip:AddLine("Assigned Buff: " .. bName, 0.9, 0.8, 0.5)
-                if uStatus.hasBuff then
+                local isDead = Buffadin:IsUnitDead(self.unitInfo.unitId)
+                if isDead then
+                    GameTooltip:AddLine("Status: |cffff2222Dead|r")
+                elseif uStatus.hasBuff then
                     GameTooltip:AddLine("Status: |cff00ff00Active|r (" .. Buffadin.Theme:FormatTime(uStatus.expiration) .. ")")
                 else
                     GameTooltip:AddLine("Status: |cffff2222Missing|r")
@@ -259,19 +261,21 @@ function Popups:ShowForClass(classId, anchorFrame)
         end
         btn.buffIcon:SetTexture(icon)
 
+        local isDead = Buffadin:IsUnitDead(unitInfo.unitId)
+
         -- Timer
         if hasBuff and remaining > 0 then
             btn.timerText:SetText(Buffadin.Theme:FormatTime(remaining))
             btn.timerText:SetTextColor(0.4, 0.9, 0.4)
         else
-            btn.timerText:SetText(unitInfo.isDead and "|cffff2222Dead|r" or "")
+            btn.timerText:SetText(isDead and "|cffff2222Dead|r" or "")
         end
 
         -- Configure Click Casting (Only out of combat)
         if not inCombat then
             local isMock = Buffadin.MockHarness and Buffadin.MockHarness.active
             local spellName = uStatus.assignedSpellName or ""
-            if spellName ~= "" and not unitInfo.isDead then
+            if spellName ~= "" and not isDead then
                 btn:SetAttribute("type1", isMock and nil or "spell")
                 btn:SetAttribute("spell1", spellName)
                 btn:SetAttribute("unit1", unitInfo.unitId)
