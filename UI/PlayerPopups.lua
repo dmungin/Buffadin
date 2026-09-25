@@ -170,6 +170,7 @@ end
 
 function Popups:ShowForClass(classId, anchorFrame)
     if not Buffadin.db.profile.showPlayerPopups then return end
+    if Buffadin:InCombat() then return end
 
     self:CancelHide()
     self.currentClassId = classId

@@ -308,14 +308,36 @@ function Bar:CreateClassButtons()
                 end
             end
 
-            GameTooltip:AddLine(" ")
-            GameTooltip:AddLine("|cff00ff00Left-Click:|r Cast Greater Blessing (or Normal if unlearned)", 0.7, 0.7, 0.7)
-            GameTooltip:AddLine("|cff00ff00Right-Click:|r Cast Normal Blessing", 0.7, 0.7, 0.7)
-            GameTooltip:AddLine("|cff00ff00Scroll / Shift-Click:|r Cycle Assigned Blessing", 0.7, 0.7, 0.7)
-            GameTooltip:AddLine("|cff00ff00Hover:|r View class members flyout", 0.7, 0.7, 0.7)
+            if Buffadin:InCombat() then
+                GameTooltip:AddLine(" ")
+                GameTooltip:AddLine("Class Members:", 0.95, 0.82, 0.3)
+                local classUnits = Buffadin.Roster.classes[self.classId] or {}
+                for _, u in ipairs(classUnits) do
+                    local isDead = Buffadin:IsUnitDead(u.unitId)
+                    local uStatus = Buffadin.BuffScanner.unitStatus[u.unitId]
+                    local hasBuff = uStatus and uStatus.hasBuff
+                    local bName = (uStatus and uStatus.assignedSpellName ~= "") and uStatus.assignedSpellName or "Blessing"
+                    if isDead then
+                        GameTooltip:AddDoubleLine("  " .. u.name, "|cffff2222Dead|r", 0.7, 0.7, 0.7)
+                    elseif hasBuff then
+                        local rem = (uStatus and uStatus.expiration) or 0
+                        GameTooltip:AddDoubleLine("  " .. u.name, "|cff00ff00" .. Buffadin.Theme:FormatTime(rem) .. "|r", 0.7, 0.7, 0.7)
+                    else
+                        GameTooltip:AddDoubleLine("  " .. u.name, "|cffff4444Missing (" .. bName .. ")|r", 1, 0.8, 0.8)
+                    end
+                end
+                GameTooltip:AddLine(" ")
+                GameTooltip:AddLine("|cff00ff00Left-Click:|r Cast Greater Blessing on Class", 0.7, 0.7, 0.7)
+            else
+                GameTooltip:AddLine(" ")
+                GameTooltip:AddLine("|cff00ff00Left-Click:|r Cast Greater Blessing (or Normal if unlearned)", 0.7, 0.7, 0.7)
+                GameTooltip:AddLine("|cff00ff00Right-Click:|r Cast Normal Blessing", 0.7, 0.7, 0.7)
+                GameTooltip:AddLine("|cff00ff00Scroll / Shift-Click:|r Cycle Assigned Blessing", 0.7, 0.7, 0.7)
+                GameTooltip:AddLine("|cff00ff00Hover:|r View class members flyout", 0.7, 0.7, 0.7)
+            end
             GameTooltip:Show()
 
-            if Buffadin.PlayerPopups then
+            if Buffadin.PlayerPopups and not Buffadin:InCombat() then
                 Buffadin.PlayerPopups:ShowForClass(self.classId, self)
             end
         end)
