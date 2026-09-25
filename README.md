@@ -52,14 +52,21 @@ You can use either `/buffadin` or `/bf`:
 
 ## Installation
 
-Clone or download this repository directly into your World of Warcraft AddOns folder:
+### Option 1: CurseForge (Recommended)
 
-```bash
-cd "World of Warcraft/_classic_beta_/Interface/AddOns"
-git clone https://github.com/<your-username>/buffadin.git Buffadin
-```
+Install and automatically manage updates via the CurseForge App or download directly from the web:
+- **CurseForge**: [Buffadin on CurseForge](https://www.curseforge.com/wow/addons/buffadin)
 
-Ensure the folder is named `Buffadin`.
+### Option 2: Manual Installation
+
+1. Download the latest release `.zip` from [GitHub Releases](https://github.com/dmungin/Buffadin/releases), or clone the repository:
+   ```bash
+   cd "World of Warcraft/_classic_beta_/Interface/AddOns"
+   git clone https://github.com/dmungin/Buffadin.git Buffadin
+   ```
+2. Extract the archive into your `Interface/AddOns/` directory.
+3. Ensure the folder is named `Buffadin` (e.g., `Interface/AddOns/Buffadin`).
+4. Launch or restart World of Warcraft.
 
 ---
 
