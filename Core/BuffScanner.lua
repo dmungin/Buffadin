@@ -341,6 +341,82 @@ function Buffadin.BuffScanner:UpdateInCombat(playerName, currentTime)
     end
 end
 
+-- =========================================================================
+-- Combat Buff Application & Tracking (Combat Log & Spellcast Event Hooks)
+-- =========================================================================
+
+function Buffadin.BuffScanner:RecordBuffApplied(unitOrClassOrName, spellId, spellName, isGreater, duration)
+    duration = duration or (isGreater and (Buffadin.DURATION_GREATER or 900) or (Buffadin.DURATION_NORMAL or 300))
+    local currentTime = GetTime()
+
+    local function ApplyToUnit(uInfo)
+        local uStatus = self.unitStatus[uInfo.unitId]
+        if not uStatus then
+            self.unitStatus[uInfo.unitId] = {
+                assignedGSpellId = 0,
+                assignedNSpellId = 0,
+                assignedSpellName = spellName or "Blessing",
+                isSpecial = false,
+            }
+            uStatus = self.unitStatus[uInfo.unitId]
+        end
+        uStatus.hasBuff = true
+        uStatus.expiration = duration
+        uStatus.absExpiration = currentTime + duration
+        uStatus.diedInCombat = false
+        if spellName and spellName ~= "" then
+            uStatus.assignedSpellName = spellName
+        end
+    end
+
+    local matchedUnits = {}
+    if type(unitOrClassOrName) == "number" and Buffadin.Roster.classes[unitOrClassOrName] then
+        -- Direct classId provided
+        matchedUnits = Buffadin.Roster.classes[unitOrClassOrName]
+    else
+        for uId, uInfo in pairs(Buffadin.Roster.units) do
+            if uId == unitOrClassOrName or uInfo.name == unitOrClassOrName or (uInfo.fullName and uInfo.fullName == unitOrClassOrName) then
+                if isGreater then
+                    matchedUnits = Buffadin.Roster.classes[uInfo.classId] or { uInfo }
+                else
+                    table.insert(matchedUnits, uInfo)
+                end
+                break
+            end
+        end
+    end
+
+    for _, u in ipairs(matchedUnits) do
+        if not Buffadin:IsUnitDead(u.unitId) then
+            ApplyToUnit(u)
+        end
+    end
+
+    self:Scan()
+    if Buffadin.BlessingsBar and Buffadin.BlessingsBar:IsShown() then
+        Buffadin.BlessingsBar:RefreshDisplay()
+    end
+end
+
+function Buffadin.BuffScanner:RecordBuffRemoved(unitOrName, spellId, spellName)
+    for uId, uInfo in pairs(Buffadin.Roster.units) do
+        if uId == unitOrName or uInfo.name == unitOrName or (uInfo.fullName and uInfo.fullName == unitOrName) then
+            local uStatus = self.unitStatus[uInfo.unitId]
+            if uStatus then
+                uStatus.hasBuff = false
+                uStatus.expiration = 0
+                uStatus.absExpiration = 0
+            end
+            break
+        end
+    end
+
+    self:Scan()
+    if Buffadin.BlessingsBar and Buffadin.BlessingsBar:IsShown() then
+        Buffadin.BlessingsBar:RefreshDisplay()
+    end
+end
+
 -- Find next best target/spell to buff (used by Auto-Buff button)
 -- Returns: targetUnit, gSpellId, nSpellId, isGreater, classId, reasonText
 function Buffadin.BuffScanner:GetNextAutoBuff()

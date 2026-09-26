@@ -63,7 +63,9 @@ function Frame:Initialize()
                 end
             else
                 Buffadin.db.profile[self.optKey] = isChecked
-                Buffadin.BlessingsBar:UpdateLayout()
+                Buffadin:RunOutOfCombat(function()
+                    Buffadin.BlessingsBar:UpdateLayout()
+                end)
             end
         end)
 

@@ -258,6 +258,40 @@ function Buffadin:FindUnitBuff(unit, targetSpellID, targetSpellName)
 end
 
 -- =========================================================================
+-- Spell Category Introspection Helpers
+-- =========================================================================
+
+function Buffadin:IsBlessingSpell(spellId, spellName)
+    if spellName and spellName ~= "" then
+        if spellName:find("^Greater Blessing") or spellName:find("^Große[rs] Segen") or spellName:find("^Bénédiction supérieure") then
+            return true, true
+        elseif spellName:find("^Blessing of") or spellName:find("^Segen de[sr]") or spellName:find("^Bénédiction de") then
+            return true, false
+        end
+    end
+    for _, g in pairs(self.GREATER_BLESSINGS) do
+        if (spellId and spellId > 0 and g.spellId == spellId) or (spellName and spellName ~= "" and g.name == spellName) then
+            return true, true
+        end
+    end
+    for _, n in pairs(self.NORMAL_BLESSINGS) do
+        if (spellId and spellId > 0 and n.spellId == spellId) or (spellName and spellName ~= "" and n.name == spellName) then
+            return true, false
+        end
+    end
+    return false, false
+end
+
+function Buffadin:IsAuraSpell(spellId, spellName)
+    for _, a in pairs(self.AURAS) do
+        if (spellId and spellId > 0 and a.spellId == spellId) or (spellName and spellName ~= "" and a.name == spellName) then
+            return true
+        end
+    end
+    return false
+end
+
+-- =========================================================================
 -- Addon Messaging Compatibility Layer
 -- =========================================================================
 

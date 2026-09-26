@@ -13,105 +13,112 @@ Bar.sealButton = nil
 -- Bar Creation & Setup
 -- =========================================================================
 function Bar:Initialize()
-    self:SetSize(400, 48)
-    self:SetClampedToScreen(true)
-    self:SetMovable(true)
-    self:EnableMouse(true)
-    self:RegisterForDrag("LeftButton")
+	self:SetSize(400, 48)
+	self:SetClampedToScreen(true)
+	self:SetMovable(true)
+	self:EnableMouse(true)
+	self:RegisterForDrag("LeftButton")
 
-    -- Load saved position
-    local db = Buffadin.db.profile
-    self:ClearAllPoints()
-    self:SetPoint(db.barPoint or "CENTER", UIParent, db.barPoint or "CENTER", db.barX or 0, db.barY or -150)
-    self:SetScale(db.barScale or 1.0)
+	-- Load saved position
+	local db = Buffadin.db.profile
+	self:ClearAllPoints()
+	self:SetPoint(db.barPoint or "CENTER", UIParent, db.barPoint or "CENTER", db.barX or 0, db.barY or -150)
+	self:SetScale(db.barScale or 1.0)
 
-    self:SetScript("OnDragStart", function(self)
-        if not Buffadin.db.profile.barLocked then
-            self:StartMoving()
-        end
-    end)
+	self:SetScript("OnDragStart", function(self)
+		if not Buffadin.db.profile.barLocked then
+			self:StartMoving()
+		end
+	end)
 
-    self:SetScript("OnDragStop", function(self)
-        self:StopMovingOrSizing()
-        local point, _, _, x, y = self:GetPoint()
-        Buffadin.db.profile.barPoint = point
-        Buffadin.db.profile.barX = x
-        Buffadin.db.profile.barY = y
-    end)
+	self:SetScript("OnDragStop", function(self)
+		self:StopMovingOrSizing()
+		local point, _, _, x, y = self:GetPoint()
+		Buffadin.db.profile.barPoint = point
+		Buffadin.db.profile.barX = x
+		Buffadin.db.profile.barY = y
+	end)
 
-    -- Bar background (subtle dark container)
-    Buffadin.Theme:ApplyCardBackdrop(self, 0.40, 0.30)
+	-- Bar background (subtle dark container)
+	Buffadin.Theme:ApplyCardBackdrop(self, 0.40, 0.30)
 
-    self:CreateUtilityButtons()
-    self:CreateClassButtons()
-    self:UpdateLayout()
+	self:CreateUtilityButtons()
+	self:CreateClassButtons()
+	self:UpdateLayout()
 end
 
 -- =========================================================================
 -- Tooltip Positioning Helper
 -- =========================================================================
 function Bar:GetTooltipAnchor(btn, isUtility)
-    local db = Buffadin.db.profile
-    local isVertical = (db.orientation == "VERTICAL")
-    local screenWidth = (UIParent and UIParent:GetWidth()) or 1920
-    local screenHeight = (UIParent and UIParent:GetHeight()) or 1080
-    local x, y = btn:GetCenter()
-    x = x or (screenWidth / 2)
-    y = y or (screenHeight / 2)
+	local db = Buffadin.db.profile
+	local isVertical = (db.orientation == "VERTICAL")
+	local screenWidth = (UIParent and UIParent:GetWidth()) or 1920
+	local screenHeight = (UIParent and UIParent:GetHeight()) or 1080
+	local x, y = btn:GetCenter()
+	x = x or (screenWidth / 2)
+	y = y or (screenHeight / 2)
 
-    if isVertical then
-        if x > (screenWidth / 2) then
-            if isUtility then
-                return "ANCHOR_LEFT", -6, 0
-            else
-                if (screenWidth - x) >= 180 then
-                    return "ANCHOR_RIGHT", 6, 0
-                else
-                    return "ANCHOR_LEFT", -6, 0
-                end
-            end
-        else
-            if isUtility then
-                return "ANCHOR_RIGHT", 6, 0
-            else
-                if x >= 180 then
-                    return "ANCHOR_LEFT", -6, 0
-                else
-                    return "ANCHOR_RIGHT", 6, 0
-                end
-            end
-        end
-    else
-        if y > (screenHeight / 2) then
-            if isUtility then
-                return "ANCHOR_BOTTOM", 0, -4
-            else
-                return "ANCHOR_TOP", 0, 4
-            end
-        else
-            if isUtility then
-                return "ANCHOR_TOP", 0, 4
-            else
-                return "ANCHOR_BOTTOM", 0, -4
-            end
-        end
-    end
+	if isVertical then
+		if x > (screenWidth / 2) then
+			if isUtility then
+				return "ANCHOR_LEFT", -6, 0
+			else
+				if (screenWidth - x) >= 180 then
+					return "ANCHOR_RIGHT", 6, 0
+				else
+					return "ANCHOR_LEFT", -6, 0
+				end
+			end
+		else
+			if isUtility then
+				return "ANCHOR_RIGHT", 6, 0
+			else
+				if x >= 180 then
+					return "ANCHOR_LEFT", -6, 0
+				else
+					return "ANCHOR_RIGHT", 6, 0
+				end
+			end
+		end
+	else
+		if y > (screenHeight / 2) then
+			if isUtility then
+				return "ANCHOR_BOTTOM", 0, -4
+			else
+				return "ANCHOR_TOP", 0, 4
+			end
+		else
+			if isUtility then
+				return "ANCHOR_TOP", 0, 4
+			else
+				return "ANCHOR_BOTTOM", 0, -4
+			end
+		end
+	end
 end
 
 -- =========================================================================
 -- Utility Buttons (Auto-Buff, Aura, Righteous Fury, Seal)
 -- =========================================================================
 function Bar:CreateUtilityButtons()
-    -- 1. Auto-Buff Button
-    local autoBtn = CreateFrame("Button", "Buffadin_AutoBuffBtn", self, "SecureActionButtonTemplate, SecureHandlerStateTemplate, BackdropTemplate")
-    autoBtn:SetSize(40, 40)
-    Buffadin.Theme:ApplyCardBackdrop(autoBtn, 0.90, 0.80)
-    autoBtn:RegisterForClicks("AnyUp", "AnyDown")
+	-- 1. Auto-Buff Button
+	local autoBtn = CreateFrame(
+		"Button",
+		"Buffadin_AutoBuffBtn",
+		self,
+		"SecureActionButtonTemplate, SecureHandlerStateTemplate, BackdropTemplate"
+	)
+	autoBtn:SetSize(40, 40)
+	Buffadin.Theme:ApplyCardBackdrop(autoBtn, 0.90, 0.80)
+	autoBtn:RegisterForClicks("AnyUp", "AnyDown")
 
-    -- Secure state driver: clear click attributes when entering combat
-    if RegisterStateDriver then
-        RegisterStateDriver(autoBtn, "combat", "[combat] in; out")
-        autoBtn:SetAttribute("_onstate-combat", [=[
+	-- Secure state driver: clear click attributes when entering combat
+	if RegisterStateDriver then
+		RegisterStateDriver(autoBtn, "combat", "[combat] in; out")
+		autoBtn:SetAttribute(
+			"_onstate-combat",
+			[=[
             if newstate == "in" then
                 self:SetAttribute("type", nil)
                 self:SetAttribute("type1", nil)
@@ -121,621 +128,724 @@ function Bar:CreateUtilityButtons()
                 self:SetAttribute("spell2", nil)
                 self:SetAttribute("unit2", nil)
             end
-        ]=])
-    end
+        ]=]
+		)
+	end
 
-    local autoIcon = autoBtn:CreateTexture(nil, "ARTWORK")
-    autoIcon:SetSize(28, 28)
-    autoIcon:SetPoint("CENTER", 0, 0)
-    autoIcon:SetTexture("Interface\\Icons\\Spell_Holy_GreaterBlessingofKings")
-    autoIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-    autoBtn.icon = autoIcon
+	local autoIcon = autoBtn:CreateTexture(nil, "ARTWORK")
+	autoIcon:SetSize(38, 38)
+	autoIcon:SetPoint("TOPLEFT", autoBtn, "TOPLEFT", 1, -1)
+	autoIcon:SetPoint("BOTTOMRIGHT", autoBtn, "BOTTOMRIGHT", -1, 1)
+	autoIcon:SetTexture("Interface\\Icons\\Spell_Holy_GreaterBlessingofKings")
+	autoIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+	autoBtn.icon = autoIcon
 
-    local autoCount = autoBtn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    autoCount:SetPoint("BOTTOMRIGHT", -2, 2)
-    autoCount:SetText("")
-    autoBtn.count = autoCount
+	local autoCount = autoBtn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	autoCount:SetPoint("BOTTOMRIGHT", -2, 2)
+	autoCount:SetText("")
+	autoBtn.count = autoCount
 
-    autoBtn:SetScript("OnEnter", function(self)
-        local anchor, xOff, yOff = Bar:GetTooltipAnchor(self, true)
-        GameTooltip:SetOwner(self, anchor, xOff, yOff)
-        GameTooltip:AddLine("Auto-Buff Next Priority", 0.95, 0.82, 0.3)
+	autoBtn:SetScript("OnEnter", function(self)
+		local anchor, xOff, yOff = Bar:GetTooltipAnchor(self, true)
+		GameTooltip:SetOwner(self, anchor, xOff, yOff)
+		GameTooltip:AddLine("Auto-Buff Next Priority", 0.95, 0.82, 0.3)
 
-        if Buffadin:InCombat() then
-            GameTooltip:AddLine("|cffff4444Disabled during combat|r", 1, 0.3, 0.3)
-            GameTooltip:AddLine("Smart auto-buff targeting is out of combat only due to game restrictions.", 0.7, 0.7, 0.7, true)
-            GameTooltip:Show()
-            return
-        end
+		if Buffadin:InCombat() then
+			GameTooltip:AddLine("|cffff4444Disabled during combat|r", 1, 0.3, 0.3)
+			GameTooltip:AddLine(
+				"Smart auto-buff targeting is out of combat only due to game restrictions.",
+				0.7,
+				0.7,
+				0.7,
+				true
+			)
+			GameTooltip:Show()
+			return
+		end
 
-        local targetUnit, gSpellId, nSpellId, isGreater, bestClassId, reasonText = Buffadin.BuffScanner:GetNextAutoBuff()
-        if reasonText then
-            GameTooltip:AddLine("Next Target: |cff00ff00" .. reasonText .. "|r", 1, 1, 1)
-        else
-            GameTooltip:AddLine("Next Target: |cff888888All players buffed|r", 1, 1, 1)
-        end
+		local targetUnit, gSpellId, nSpellId, isGreater, bestClassId, reasonText =
+			Buffadin.BuffScanner:GetNextAutoBuff()
+		if reasonText then
+			GameTooltip:AddLine("Next Target: |cff00ff00" .. reasonText .. "|r", 1, 1, 1)
+		else
+			GameTooltip:AddLine("Next Target: |cff888888All players buffed|r", 1, 1, 1)
+		end
 
-        GameTooltip:AddLine(" ")
-        GameTooltip:AddLine("Priority Calculation Order:", 0.8, 0.8, 0.8)
-        GameTooltip:AddLine(" 1. Missing Paladin self-aura", 0.7, 0.7, 0.7)
-        GameTooltip:AddLine(" 2. Class with the most missing buffs", 0.7, 0.7, 0.7)
-        GameTooltip:AddLine(" 3. Expiring blessings (< 2 min remaining)", 0.7, 0.7, 0.7)
-        GameTooltip:AddLine(" 4. Individual normal overrides", 0.7, 0.7, 0.7)
-        GameTooltip:AddLine(" ")
-        GameTooltip:AddLine("|cff00ff00Left-Click:|r Cast Greater Blessing (or Normal if unlearned)", 0.7, 0.7, 0.7)
-        GameTooltip:AddLine("|cff00ff00Right-Click:|r Cast Normal Blessing on next player", 0.7, 0.7, 0.7)
-        GameTooltip:Show()
-    end)
-    autoBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+		GameTooltip:AddLine(" ")
+		GameTooltip:AddLine("Priority Calculation Order:", 0.8, 0.8, 0.8)
+		GameTooltip:AddLine(" 1. Missing Paladin self-aura", 0.7, 0.7, 0.7)
+		GameTooltip:AddLine(" 2. Class with the most missing buffs", 0.7, 0.7, 0.7)
+		GameTooltip:AddLine(" 3. Expiring blessings (< 2 min remaining)", 0.7, 0.7, 0.7)
+		GameTooltip:AddLine(" 4. Individual normal overrides", 0.7, 0.7, 0.7)
+		GameTooltip:AddLine(" ")
+		GameTooltip:AddLine("|cff00ff00Left-Click:|r Cast Greater Blessing (or Normal if unlearned)", 0.7, 0.7, 0.7)
+		GameTooltip:AddLine("|cff00ff00Right-Click:|r Cast Normal Blessing on next player", 0.7, 0.7, 0.7)
+		GameTooltip:Show()
+	end)
+	autoBtn:SetScript("OnLeave", function()
+		GameTooltip:Hide()
+	end)
 
-    self.autoButton = autoBtn
+	self.autoButton = autoBtn
 
-    -- 2. Aura Button
-    local auraBtn = CreateFrame("Button", "Buffadin_AuraBtn", self, "SecureActionButtonTemplate, BackdropTemplate")
-    auraBtn:SetSize(40, 40)
-    Buffadin.Theme:ApplyCardBackdrop(auraBtn, 0.90, 0.80)
-    auraBtn:RegisterForClicks("AnyUp", "AnyDown")
-    auraBtn:EnableMouseWheel(true)
+	-- 2. Aura Button
+	local auraBtn = CreateFrame("Button", "Buffadin_AuraBtn", self, "SecureActionButtonTemplate, BackdropTemplate")
+	auraBtn:SetSize(40, 40)
+	Buffadin.Theme:ApplyCardBackdrop(auraBtn, 0.90, 0.80)
+	auraBtn:RegisterForClicks("AnyUp", "AnyDown")
+	auraBtn:EnableMouseWheel(true)
 
-    local auraIcon = auraBtn:CreateTexture(nil, "ARTWORK")
-    auraIcon:SetSize(28, 28)
-    auraIcon:SetPoint("CENTER", 0, 0)
-    auraIcon:SetTexture("Interface\\Icons\\Spell_Holy_DevotionAura")
-    auraIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-    auraBtn.icon = auraIcon
+	local auraIcon = auraBtn:CreateTexture(nil, "ARTWORK")
+	auraIcon:SetSize(38, 38)
+	auraIcon:SetPoint("TOPLEFT", auraBtn, "TOPLEFT", 1, -1)
+	auraIcon:SetPoint("BOTTOMRIGHT", auraBtn, "BOTTOMRIGHT", -1, 1)
+	auraIcon:SetTexture("Interface\\Icons\\Spell_Holy_DevotionAura")
+	auraIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+	auraBtn.icon = auraIcon
 
-    auraBtn:SetScript("OnEnter", function(self)
-        local anchor, xOff, yOff = Bar:GetTooltipAnchor(self, true)
-        GameTooltip:SetOwner(self, anchor, xOff, yOff)
-        GameTooltip:AddLine("Assigned Paladin Aura", 0.95, 0.82, 0.3)
-        local playerName = UnitName("player")
-        local auraIndex = Buffadin.Assignments:GetAura(playerName)
-        local aInfo = Buffadin.AURAS[auraIndex]
-        GameTooltip:AddLine("Assigned: " .. (aInfo and aInfo.name or "None"), 1, 1, 1)
-        GameTooltip:AddLine("Left-Click: Cast Aura", 0, 1, 0)
-        GameTooltip:AddLine("Scroll / Shift-Click: Cycle Assigned Aura", 0.7, 0.7, 0.7)
-        GameTooltip:Show()
-    end)
-    auraBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+	auraBtn:SetScript("OnEnter", function(self)
+		local anchor, xOff, yOff = Bar:GetTooltipAnchor(self, true)
+		GameTooltip:SetOwner(self, anchor, xOff, yOff)
+		GameTooltip:AddLine("Assigned Paladin Aura", 0.95, 0.82, 0.3)
+		local playerName = UnitName("player")
+		local auraIndex = Buffadin.Assignments:GetAura(playerName)
+		local aInfo = Buffadin.AURAS[auraIndex]
+		GameTooltip:AddLine("Assigned: " .. (aInfo and aInfo.name or "None"), 1, 1, 1)
+		GameTooltip:AddLine("Left-Click: Cast Aura", 0, 1, 0)
+		GameTooltip:AddLine("Scroll / Shift-Click: Cycle Assigned Aura", 0.7, 0.7, 0.7)
+		GameTooltip:Show()
+	end)
+	auraBtn:SetScript("OnLeave", function()
+		GameTooltip:Hide()
+	end)
 
-    auraBtn:SetScript("OnMouseWheel", function(self, delta)
-        local pallyName = UnitName("player")
-        local step = (delta > 0) and 1 or -1
-        Buffadin.Assignments:CycleAura(pallyName, step)
-        if GetMouseFocus and GetMouseFocus() == self then
-            self:GetScript("OnEnter")(self)
-        end
-    end)
+	auraBtn:SetScript("OnMouseWheel", function(self, delta)
+		local pallyName = UnitName("player")
+		local step = (delta > 0) and 1 or -1
+		Buffadin.Assignments:CycleAura(pallyName, step)
+		if self:IsMouseOver() then
+			self:GetScript("OnEnter")(self)
+		end
+	end)
 
-    auraBtn:SetScript("PreClick", function(self, button)
-        if IsShiftKeyDown and IsShiftKeyDown() then
-            local pallyName = UnitName("player")
-            local step = (button == "RightButton") and -1 or 1
-            Buffadin.Assignments:CycleAura(pallyName, step)
-            if GetMouseFocus and GetMouseFocus() == self then
-                self:GetScript("OnEnter")(self)
-            end
-        end
-    end)
+	auraBtn:SetScript("PreClick", function(self, button)
+		if IsShiftKeyDown and IsShiftKeyDown() then
+			local pallyName = UnitName("player")
+			local step = (button == "RightButton") and -1 or 1
+			Buffadin.Assignments:CycleAura(pallyName, step)
+			if self:IsMouseOver() then
+				self:GetScript("OnEnter")(self)
+			end
+		end
+	end)
 
-    self.auraButton = auraBtn
+	self.auraButton = auraBtn
 
-    -- 3. Righteous Fury Button
-    local rfBtn = CreateFrame("Button", "Buffadin_RFBtn", self, "SecureActionButtonTemplate, BackdropTemplate")
-    rfBtn:SetSize(40, 40)
-    Buffadin.Theme:ApplyCardBackdrop(rfBtn, 0.90, 0.80)
-    rfBtn:RegisterForClicks("AnyUp", "AnyDown")
+	-- 3. Righteous Fury Button
+	local rfBtn = CreateFrame("Button", "Buffadin_RFBtn", self, "SecureActionButtonTemplate, BackdropTemplate")
+	rfBtn:SetSize(40, 40)
+	Buffadin.Theme:ApplyCardBackdrop(rfBtn, 0.90, 0.80)
+	rfBtn:RegisterForClicks("AnyUp", "AnyDown")
 
-    local rfIcon = rfBtn:CreateTexture(nil, "ARTWORK")
-    rfIcon:SetSize(28, 28)
-    rfIcon:SetPoint("CENTER", 0, 0)
-    rfIcon:SetTexture(Buffadin.RIGHTEOUS_FURY.icon)
-    rfIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-    rfBtn.icon = rfIcon
+	local rfIcon = rfBtn:CreateTexture(nil, "ARTWORK")
+	rfIcon:SetSize(38, 38)
+	rfIcon:SetPoint("TOPLEFT", rfBtn, "TOPLEFT", 1, -1)
+	rfIcon:SetPoint("BOTTOMRIGHT", rfBtn, "BOTTOMRIGHT", -1, 1)
+	rfIcon:SetTexture(Buffadin.RIGHTEOUS_FURY.icon)
+	rfIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+	rfBtn.icon = rfIcon
 
-    rfBtn:SetScript("OnEnter", function(self)
-        local anchor, xOff, yOff = Bar:GetTooltipAnchor(self, true)
-        GameTooltip:SetOwner(self, anchor, xOff, yOff)
-        GameTooltip:AddLine("Righteous Fury", 0.95, 0.82, 0.3)
-        GameTooltip:AddLine("Left-Click: Cast Righteous Fury", 0, 1, 0)
-        GameTooltip:Show()
-    end)
-    rfBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+	rfBtn:SetScript("OnEnter", function(self)
+		local anchor, xOff, yOff = Bar:GetTooltipAnchor(self, true)
+		GameTooltip:SetOwner(self, anchor, xOff, yOff)
+		GameTooltip:AddLine("Righteous Fury", 0.95, 0.82, 0.3)
+		GameTooltip:AddLine("Left-Click: Cast Righteous Fury", 0, 1, 0)
+		GameTooltip:Show()
+	end)
+	rfBtn:SetScript("OnLeave", function()
+		GameTooltip:Hide()
+	end)
 
-    self.rfButton = rfBtn
+	self.rfButton = rfBtn
 end
 
 -- =========================================================================
 -- Class Buttons Creation
 -- =========================================================================
 function Bar:CreateClassButtons()
-    for _, cls in ipairs(Buffadin.CLASSES) do
-        local btn = CreateFrame("Button", "Buffadin_ClassBtn" .. cls.id, self, "SecureActionButtonTemplate, BackdropTemplate")
-        btn:SetSize(56, 40)
-        Buffadin.Theme:ApplyCardBackdrop(btn, 0.85, 0.70)
-        btn:RegisterForClicks("AnyUp", "AnyDown")
-        btn:EnableMouseWheel(true)
+	for _, cls in ipairs(Buffadin.CLASSES) do
+		local btn =
+			CreateFrame("Button", "Buffadin_ClassBtn" .. cls.id, self, "SecureActionButtonTemplate, BackdropTemplate")
+		btn:SetSize(40, 40)
+		Buffadin.Theme:ApplyCardBackdrop(btn, 0.85, 0.70)
+		btn:RegisterForClicks("AnyUp", "AnyDown")
+		btn:EnableMouseWheel(true)
 
-        btn.classId = cls.id
-        btn.classToken = cls.token
+		btn.classId = cls.id
+		btn.classToken = cls.token
 
-        -- Class Icon (left side)
-        local classIcon = btn:CreateTexture(nil, "ARTWORK")
-        classIcon:SetSize(22, 22)
-        classIcon:SetPoint("LEFT", 4, 0)
-        classIcon:SetTexture(cls.icon)
-        classIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-        btn.classIcon = classIcon
+		-- Class Icon (fills button snugly inside 1px border, 38x38 in 40x40)
+		local classIcon = btn:CreateTexture(nil, "ARTWORK")
+		classIcon:SetSize(38, 38)
+		classIcon:SetPoint("TOPLEFT", btn, "TOPLEFT", 1, -1)
+		classIcon:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -1, 1)
+		classIcon:SetTexture(cls.icon)
+		classIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+		btn.classIcon = classIcon
 
-        -- Blessing Icon (right side)
-        local buffIcon = btn:CreateTexture(nil, "ARTWORK")
-        buffIcon:SetSize(22, 22)
-        buffIcon:SetPoint("RIGHT", -4, 0)
-        buffIcon:SetTexture(Buffadin.GREATER_BLESSINGS[0].icon)
-        buffIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-        btn.buffIcon = buffIcon
+		-- Blessing icon overlay badge (bottom-right)
+		local buffIcon = btn:CreateTexture(nil, "OVERLAY", nil, 2)
+		buffIcon:SetSize(13, 13)
+		buffIcon:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -2, 2)
+		buffIcon:SetTexture(Buffadin.GREATER_BLESSINGS[0].icon)
+		buffIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+		btn.buffIcon = buffIcon
 
-        -- Missing Count Badge (top-right overlay)
-        local countText = btn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        countText:SetPoint("TOPRIGHT", -2, -2)
-        countText:SetText("")
-        btn.countText = countText
+		-- Blessing badge dark background
+		local buffBadgeBg = btn:CreateTexture(nil, "OVERLAY", nil, 1)
+		buffBadgeBg:SetPoint("TOPLEFT", buffIcon, "TOPLEFT", -1, 1)
+		buffBadgeBg:SetPoint("BOTTOMRIGHT", buffIcon, "BOTTOMRIGHT", 1, -1)
+		buffBadgeBg:SetColorTexture(0.04, 0.04, 0.06, 0.92)
+		btn.buffBadgeBg = buffBadgeBg
+		btn.classBadgeBg = buffBadgeBg -- backwards compatibility alias
 
-        -- Timer (bottom-center)
-        local timerText = btn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        timerText:SetPoint("BOTTOM", 0, 2)
-        timerText:SetFont("Fonts\\FRIZQT__.TTF", 9, "OUTLINE")
-        timerText:SetText("")
-        btn.timerText = timerText
+		-- Missing Count Badge (legacy alias, kept for compatibility)
+		local countText = btn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+		countText:SetPoint("TOPRIGHT", -2, -2)
+		countText:SetText("")
+		btn.countText = countText
 
-        -- Tooltip & Flyout trigger
-        btn:SetScript("OnEnter", function(self)
-            local anchor, xOff, yOff = Bar:GetTooltipAnchor(self, false)
-            GameTooltip:SetOwner(self, anchor, xOff, yOff)
-            local clsConfig = Buffadin.CLASS_BY_ID[self.classId]
-            GameTooltip:AddLine(clsConfig and clsConfig.name or "Class", 0.95, 0.82, 0.3)
+		-- Timer / Missing Count (bottom-left)
+		local timerText = btn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+		timerText:SetPoint("BOTTOMLEFT", btn, "BOTTOMLEFT", 0.5, 2)
+		timerText:SetJustifyH("LEFT")
+		timerText:SetFont("Fonts\\FRIZQT__.TTF", 9, "OUTLINE")
+		timerText:SetText("")
+		btn.timerText = timerText
 
-            local statusInfo = Buffadin.BuffScanner.classStatus[self.classId]
-            local gIndex = statusInfo and statusInfo.assignedGSpell or 0
-            local gConfig = Buffadin.GREATER_BLESSINGS[gIndex]
-            GameTooltip:AddLine("Assigned: " .. (gConfig and gConfig.name or "None"), 1, 1, 1)
+		-- Tooltip & Flyout trigger
+		btn:SetScript("OnEnter", function(self)
+			local anchor, xOff, yOff = Bar:GetTooltipAnchor(self, false)
+			GameTooltip:SetOwner(self, anchor, xOff, yOff)
+			local clsConfig = Buffadin.CLASS_BY_ID[self.classId]
+			GameTooltip:AddLine(clsConfig and clsConfig.name or "Class", 0.95, 0.82, 0.3)
 
-            if statusInfo then
-                GameTooltip:AddLine(string.format("Status: %d / %d Buffed (Missing: %d)",
-                    statusInfo.totalCount - statusInfo.missingCount, statusInfo.totalCount, statusInfo.missingCount), 0.8, 0.8, 0.8)
-                if statusInfo.minExpiration > 0 then
-                    GameTooltip:AddLine("Remaining: " .. Buffadin.Theme:FormatTime(statusInfo.minExpiration), 0.4, 0.8, 1)
-                end
-            end
+			local statusInfo = Buffadin.BuffScanner.classStatus[self.classId]
+			local gIndex = statusInfo and statusInfo.assignedGSpell or 0
+			local gConfig = Buffadin.GREATER_BLESSINGS[gIndex]
+			GameTooltip:AddLine("Assigned: " .. (gConfig and gConfig.name or "None"), 1, 1, 1)
 
-            if Buffadin:InCombat() then
-                GameTooltip:AddLine(" ")
-                GameTooltip:AddLine("Class Members:", 0.95, 0.82, 0.3)
-                local classUnits = Buffadin.Roster.classes[self.classId] or {}
-                for _, u in ipairs(classUnits) do
-                    local isDead = Buffadin:IsUnitDead(u.unitId)
-                    local uStatus = Buffadin.BuffScanner.unitStatus[u.unitId]
-                    local hasBuff = uStatus and uStatus.hasBuff
-                    local bName = (uStatus and uStatus.assignedSpellName ~= "") and uStatus.assignedSpellName or "Blessing"
-                    if isDead then
-                        GameTooltip:AddDoubleLine("  " .. u.name, "|cffff2222Dead|r", 0.7, 0.7, 0.7)
-                    elseif hasBuff then
-                        local rem = (uStatus and uStatus.expiration) or 0
-                        GameTooltip:AddDoubleLine("  " .. u.name, "|cff00ff00" .. Buffadin.Theme:FormatTime(rem) .. "|r", 0.7, 0.7, 0.7)
-                    else
-                        GameTooltip:AddDoubleLine("  " .. u.name, "|cffff4444Missing (" .. bName .. ")|r", 1, 0.8, 0.8)
-                    end
-                end
-                GameTooltip:AddLine(" ")
-                GameTooltip:AddLine("|cff00ff00Left-Click:|r Cast Greater Blessing on Class", 0.7, 0.7, 0.7)
-            else
-                GameTooltip:AddLine(" ")
-                GameTooltip:AddLine("|cff00ff00Left-Click:|r Cast Greater Blessing (or Normal if unlearned)", 0.7, 0.7, 0.7)
-                GameTooltip:AddLine("|cff00ff00Right-Click:|r Cast Normal Blessing", 0.7, 0.7, 0.7)
-                GameTooltip:AddLine("|cff00ff00Scroll / Shift-Click:|r Cycle Assigned Blessing", 0.7, 0.7, 0.7)
-                GameTooltip:AddLine("|cff00ff00Hover:|r View class members flyout", 0.7, 0.7, 0.7)
-            end
-            GameTooltip:Show()
+			if statusInfo then
+				GameTooltip:AddLine(
+					string.format(
+						"Status: %d / %d Buffed (Missing: %d)",
+						statusInfo.totalCount - statusInfo.missingCount,
+						statusInfo.totalCount,
+						statusInfo.missingCount
+					),
+					0.8,
+					0.8,
+					0.8
+				)
+				if statusInfo.minExpiration > 0 then
+					GameTooltip:AddLine(
+						"Remaining: " .. Buffadin.Theme:FormatTime(statusInfo.minExpiration),
+						0.4,
+						0.8,
+						1
+					)
+				end
+			end
 
-            if Buffadin.PlayerPopups and not Buffadin:InCombat() then
-                Buffadin.PlayerPopups:ShowForClass(self.classId, self)
-            end
-        end)
+			if Buffadin:InCombat() then
+				GameTooltip:AddLine(" ")
+				GameTooltip:AddLine("Class Members:", 0.95, 0.82, 0.3)
+				local classUnits = Buffadin.Roster.classes[self.classId] or {}
+				for _, u in ipairs(classUnits) do
+					local isDead = Buffadin:IsUnitDead(u.unitId)
+					local uStatus = Buffadin.BuffScanner.unitStatus[u.unitId]
+					local hasBuff = uStatus and uStatus.hasBuff
+					local bName = (uStatus and uStatus.assignedSpellName ~= "") and uStatus.assignedSpellName
+						or "Blessing"
+					if isDead then
+						GameTooltip:AddDoubleLine("  " .. u.name, "|cffff2222Dead|r", 0.7, 0.7, 0.7)
+					elseif hasBuff then
+						local rem = (uStatus and uStatus.expiration) or 0
+						GameTooltip:AddDoubleLine(
+							"  " .. u.name,
+							"|cff00ff00" .. Buffadin.Theme:FormatTime(rem) .. "|r",
+							0.7,
+							0.7,
+							0.7
+						)
+					else
+						GameTooltip:AddDoubleLine("  " .. u.name, "|cffff4444Missing (" .. bName .. ")|r", 1, 0.8, 0.8)
+					end
+				end
+				GameTooltip:AddLine(" ")
+				GameTooltip:AddLine("|cff00ff00Left-Click:|r Cast Greater Blessing on Class", 0.7, 0.7, 0.7)
+			else
+				GameTooltip:AddLine(" ")
+				GameTooltip:AddLine(
+					"|cff00ff00Left-Click:|r Cast Greater Blessing (or Normal if unlearned)",
+					0.7,
+					0.7,
+					0.7
+				)
+				GameTooltip:AddLine("|cff00ff00Right-Click:|r Cast Normal Blessing", 0.7, 0.7, 0.7)
+				GameTooltip:AddLine("|cff00ff00Scroll / Shift-Click:|r Cycle Assigned Blessing", 0.7, 0.7, 0.7)
+				GameTooltip:AddLine("|cff00ff00Hover:|r View class members flyout", 0.7, 0.7, 0.7)
+			end
+			GameTooltip:Show()
 
-        btn:SetScript("OnLeave", function(self)
-            GameTooltip:Hide()
-            if Buffadin.PlayerPopups and not Buffadin.PlayerPopups:IsMouseOver() then
-                Buffadin.PlayerPopups:ScheduleHide()
-            end
-        end)
+			if Buffadin.PlayerPopups and not Buffadin:InCombat() then
+				Buffadin.PlayerPopups:ShowForClass(self.classId, self)
+			end
+		end)
 
-        btn:SetScript("OnMouseWheel", function(self, delta)
-            local pallyName = UnitName("player")
-            local step = (delta > 0) and 1 or -1
-            Buffadin.Assignments:CycleGreater(pallyName, self.classId, step)
-            if GetMouseFocus and GetMouseFocus() == self then
-                self:GetScript("OnEnter")(self)
-            end
-        end)
+		btn:SetScript("OnLeave", function(self)
+			GameTooltip:Hide()
+			if Buffadin.PlayerPopups and not Buffadin.PlayerPopups:IsMouseOver() then
+				Buffadin.PlayerPopups:ScheduleHide()
+			end
+		end)
 
-        btn:SetScript("PreClick", function(self, button)
-            if IsShiftKeyDown and IsShiftKeyDown() then
-                local pallyName = UnitName("player")
-                local step = (button == "RightButton") and -1 or 1
-                Buffadin.Assignments:CycleGreater(pallyName, self.classId, step)
-                if GetMouseFocus and GetMouseFocus() == self then
-                    self:GetScript("OnEnter")(self)
-                end
-            end
-        end)
+		btn:SetScript("OnMouseWheel", function(self, delta)
+			local pallyName = UnitName("player")
+			local step = (delta > 0) and 1 or -1
+			Buffadin.Assignments:CycleGreater(pallyName, self.classId, step)
+			if self:IsMouseOver() then
+				self:GetScript("OnEnter")(self)
+			end
+		end)
 
-        self.buttons[cls.id] = btn
-    end
+		btn:SetScript("PreClick", function(self, button)
+			if IsShiftKeyDown and IsShiftKeyDown() then
+				local pallyName = UnitName("player")
+				local step = (button == "RightButton") and -1 or 1
+				Buffadin.Assignments:CycleGreater(pallyName, self.classId, step)
+				if self:IsMouseOver() then
+					self:GetScript("OnEnter")(self)
+				end
+			end
+		end)
+
+		self.buttons[cls.id] = btn
+	end
 end
 
 -- =========================================================================
 -- Layout & Attributes Update
 -- =========================================================================
 function Bar:UpdateLayout()
-    local db = Buffadin.db.profile
-    if not db.enabled then
-        self:Hide()
-        return
-    end
+	if Buffadin:InCombat() then
+		Buffadin:RunOutOfCombat(function()
+			Bar:UpdateLayout()
+		end, "BlessingsBar_UpdateLayout")
+		return
+	end
 
-    -- Visibility based on group type
-    local inRaid = Buffadin:IsInRaid()
-    local inGroup = Buffadin:IsInGroup()
-    if inRaid and not db.showInRaid then
-        self:Hide()
-        return
-    elseif not inRaid and inGroup and not db.showInParty then
-        self:Hide()
-        return
-    elseif not inGroup and not db.showWhenSolo then
-        self:Hide()
-        return
-    end
+	local db = Buffadin.db.profile
+	if not db.enabled then
+		self:Hide()
+		return
+	end
 
-    self:Show()
+	-- Visibility based on group type
+	local inRaid = Buffadin:IsInRaid()
+	local inGroup = Buffadin:IsInGroup()
+	if inRaid and not db.showInRaid then
+		self:Hide()
+		return
+	elseif not inRaid and inGroup and not db.showInParty then
+		self:Hide()
+		return
+	elseif not inGroup and not db.showWhenSolo then
+		self:Hide()
+		return
+	end
 
-    local isVertical = (db.orientation == "VERTICAL")
-    local offset = 4
-    local btnSpacing = 4
+	self:Show()
 
-    local function PlaceButton(btn, w, h)
-        btn:ClearAllPoints()
-        if isVertical then
-            btn:SetPoint("TOP", self, "TOP", 0, -offset)
-            offset = offset + h + btnSpacing
-        else
-            btn:SetPoint("LEFT", self, "LEFT", offset, 0)
-            offset = offset + w + btnSpacing
-        end
-        btn:Show()
-    end
+	local isVertical = (db.orientation == "VERTICAL")
+	local offset = 4
+	local btnSpacing = 4
 
-    -- 1. Position Auto-Buff Button
-    if db.showAutoButton and self.autoButton then
-        PlaceButton(self.autoButton, 40, 40)
-    elseif self.autoButton then
-        self.autoButton:Hide()
-    end
+	local btnW, btnH = 40, 40
 
-    -- 2. Position Aura Button
-    if db.showAuraButton and self.auraButton then
-        PlaceButton(self.auraButton, 40, 40)
-    elseif self.auraButton then
-        self.auraButton:Hide()
-    end
+	local function PlaceButton(btn, w, h)
+		btn:ClearAllPoints()
+		btn:SetSize(w, h)
+		if isVertical then
+			btn:SetPoint("TOP", self, "TOP", 0, -offset)
+			offset = offset + h + btnSpacing
+		else
+			btn:SetPoint("LEFT", self, "LEFT", offset, 0)
+			offset = offset + w + btnSpacing
+		end
+		btn:Show()
+	end
 
-    -- 3. Position Righteous Fury Button
-    if db.showRfButton and self.rfButton then
-        PlaceButton(self.rfButton, 40, 40)
-    elseif self.rfButton then
-        self.rfButton:Hide()
-    end
+	-- Update Utility Button Icon Sizes & Positions
+	local utilIconSize = 38
+	if self.autoButton then
+		self.autoButton.icon:ClearAllPoints()
+		self.autoButton.icon:SetPoint("TOPLEFT", self.autoButton, "TOPLEFT", 1, -1)
+		self.autoButton.icon:SetPoint("BOTTOMRIGHT", self.autoButton, "BOTTOMRIGHT", -1, 1)
+		self.autoButton.icon:SetSize(utilIconSize, utilIconSize)
+		self.autoButton.count:ClearAllPoints()
+		self.autoButton.count:SetPoint("BOTTOMRIGHT", -2, 2)
+	end
+	if self.auraButton then
+		self.auraButton.icon:ClearAllPoints()
+		self.auraButton.icon:SetPoint("TOPLEFT", self.auraButton, "TOPLEFT", 1, -1)
+		self.auraButton.icon:SetPoint("BOTTOMRIGHT", self.auraButton, "BOTTOMRIGHT", -1, 1)
+		self.auraButton.icon:SetSize(utilIconSize, utilIconSize)
+	end
+	if self.rfButton then
+		self.rfButton.icon:ClearAllPoints()
+		self.rfButton.icon:SetPoint("TOPLEFT", self.rfButton, "TOPLEFT", 1, -1)
+		self.rfButton.icon:SetPoint("BOTTOMRIGHT", self.rfButton, "BOTTOMRIGHT", -1, 1)
+		self.rfButton.icon:SetSize(utilIconSize, utilIconSize)
+	end
 
-    -- 4. Position Class Buttons
-    local visibleClassCount = 0
-    for _, cls in ipairs(Buffadin.CLASSES) do
-        local btn = self.buttons[cls.id]
-        local classUnits = Buffadin.Roster.classes[cls.id]
-        local hasMembers = classUnits and (#classUnits > 0)
+	-- 1. Position Auto-Buff Button
+	if db.showAutoButton and self.autoButton then
+		PlaceButton(self.autoButton, btnW, btnH)
+	elseif self.autoButton then
+		self.autoButton:Hide()
+	end
 
-        -- Show button only if class has members present in the group
-        if hasMembers then
-            PlaceButton(btn, 56, 40)
-            visibleClassCount = visibleClassCount + 1
-        else
-            btn:Hide()
-        end
-    end
+	-- 2. Position Aura Button
+	if db.showAuraButton and self.auraButton then
+		PlaceButton(self.auraButton, btnW, btnH)
+	elseif self.auraButton then
+		self.auraButton:Hide()
+	end
 
-    if isVertical then
-        local totalHeight = math.max(64, offset + 2)
-        self:SetSize(64, totalHeight)
-    else
-        local totalWidth = math.max(120, offset + 2)
-        self:SetSize(totalWidth, 48)
-    end
+	-- 3. Position Righteous Fury Button
+	if db.showRfButton and self.rfButton then
+		PlaceButton(self.rfButton, btnW, btnH)
+	elseif self.rfButton then
+		self.rfButton:Hide()
+	end
 
-    self:RefreshDisplay()
+	-- 4. Position Class Buttons
+	local visibleClassCount = 0
+	for _, cls in ipairs(Buffadin.CLASSES) do
+		local btn = self.buttons[cls.id]
+		local classUnits = Buffadin.Roster.classes[cls.id]
+		local hasMembers = classUnits and (#classUnits > 0)
+
+		if btn then
+			if hasMembers then
+				PlaceButton(btn, btnW, btnH)
+				visibleClassCount = visibleClassCount + 1
+			else
+				btn:Hide()
+			end
+		end
+	end
+
+	if isVertical then
+		local barWidth = 48
+		local totalHeight = math.max(barWidth, offset + 2)
+		self:SetSize(barWidth, totalHeight)
+	else
+		local barHeight = 48
+		local totalWidth = math.max(80, offset + 2)
+		self:SetSize(totalWidth, barHeight)
+	end
+
+	self:RefreshDisplay()
 end
 
 -- =========================================================================
 -- Refresh Display & Secure Attributes
 -- =========================================================================
 function Bar:RefreshDisplay()
-    local playerName = UnitName("player")
-    local inCombat = Buffadin:InCombat()
+	local playerName = UnitName("player")
+	local inCombat = Buffadin:InCombat()
 
-    -- 1. Update Class Buttons Visuals & Attributes
-    for _, cls in ipairs(Buffadin.CLASSES) do
-        local btn = self.buttons[cls.id]
-        if btn and btn:IsShown() then
-            local statusInfo = Buffadin.BuffScanner.classStatus[cls.id] or {}
-            local gIndex = Buffadin.Assignments:GetGreater(playerName, cls.id)
-            local gConfig = Buffadin.GREATER_BLESSINGS[gIndex]
+	-- 1. Update Class Buttons Visuals & Attributes
+	for _, cls in ipairs(Buffadin.CLASSES) do
+		local btn = self.buttons[cls.id]
+		if btn and btn:IsShown() then
+			local statusInfo = Buffadin.BuffScanner.classStatus[cls.id] or {}
+			local gIndex = Buffadin.Assignments:GetGreater(playerName, cls.id)
+			local gConfig = Buffadin.GREATER_BLESSINGS[gIndex]
 
-            -- Update Icons
-            if gConfig and gConfig.spellId > 0 then
-                btn.buffIcon:SetTexture(gConfig.icon)
-                btn.buffIcon:SetDesaturated(false)
-            else
-                btn.buffIcon:SetTexture(Buffadin.GREATER_BLESSINGS[0].icon)
-                btn.buffIcon:SetDesaturated(true)
-            end
+			-- Update Icons
+			if gConfig and gConfig.spellId > 0 then
+				btn.buffIcon:SetTexture(gConfig.icon)
+				btn.buffIcon:SetDesaturated(false)
+			else
+				btn.buffIcon:SetTexture(Buffadin.GREATER_BLESSINGS[0].icon)
+				btn.buffIcon:SetDesaturated(true)
+			end
 
-            -- Update Status Border
-            Buffadin.Theme:SetBorderStatus(btn, statusInfo.status or "Disabled")
+			-- Update Status Border
+			Buffadin.Theme:SetBorderStatus(btn, statusInfo.status or "Disabled")
 
-            -- Update Missing Count Text
-            if Buffadin.db.profile.showCounts and statusInfo.missingCount and statusInfo.missingCount > 0 then
-                btn.countText:SetText(tostring(statusInfo.missingCount))
-                btn.countText:SetTextColor(1, 0.3, 0.3)
-            else
-                btn.countText:SetText("")
-            end
+			-- Update Status Text (bottom-left corner timer or missing count)
+			btn.countText:SetText("")
 
-            -- Update Timer
-            if Buffadin.db.profile.showTimers and statusInfo.minExpiration and statusInfo.minExpiration > 0 then
-                btn.timerText:SetText(Buffadin.Theme:FormatTime(statusInfo.minExpiration))
-                if statusInfo.minExpiration < 60 then
-                    btn.timerText:SetTextColor(1, 0.2, 0.2)
-                elseif statusInfo.minExpiration < 180 then
-                    btn.timerText:SetTextColor(1, 0.8, 0.2)
-                else
-                    btn.timerText:SetTextColor(0.3, 1, 0.3)
-                end
-            else
-                btn.timerText:SetText("")
-            end
+			local hasMissing = (statusInfo.missingCount and statusInfo.missingCount > 0)
+			if hasMissing and Buffadin.db.profile.showCounts then
+				btn.timerText:SetText(tostring(statusInfo.missingCount))
+				btn.timerText:SetTextColor(1, 0.25, 0.25)
+			elseif Buffadin.db.profile.showTimers and statusInfo.minExpiration and statusInfo.minExpiration > 0 then
+				btn.timerText:SetText(Buffadin.Theme:FormatTime(statusInfo.minExpiration))
+				if statusInfo.minExpiration < 60 then
+					btn.timerText:SetTextColor(1, 0.2, 0.2)
+				elseif statusInfo.minExpiration < 180 then
+					btn.timerText:SetTextColor(1, 0.8, 0.2)
+				else
+					btn.timerText:SetTextColor(0.3, 1, 0.3)
+				end
+			else
+				btn.timerText:SetText("")
+			end
 
-            -- Configure Secure Attributes (Only when out of combat!)
-            if not inCombat then
-                local isMock = Buffadin.MockHarness and Buffadin.MockHarness.active
-                local gKnown = (gConfig and gConfig.spellId > 0) and Buffadin:IsSpellKnown(gConfig.spellId)
-                local gSpellName = (gConfig and gConfig.spellId > 0) and Buffadin:GetSpellName(gConfig.spellId) or ""
-                local classUnits = Buffadin.Roster.classes[cls.id] or {}
+			-- Configure Secure Attributes (Only when out of combat!)
+			if not inCombat then
+				local isMock = Buffadin.MockHarness and Buffadin.MockHarness.active
+				local gKnown = (gConfig and gConfig.spellId > 0) and Buffadin:IsSpellKnown(gConfig.spellId)
+				local gSpellName = (gConfig and gConfig.spellId > 0) and Buffadin:GetSpellName(gConfig.spellId) or ""
+				local classUnits = Buffadin.Roster.classes[cls.id] or {}
 
-                -- Determine Right Click target & spell (Single target buffing: prioritize missing overrides, then missing class buffs)
-                local rightTarget = nil
-                local rightSpellName = ""
-                local inRangeSpecial = nil
-                local anySpecial = nil
-                local inRangeMissing = nil
-                local anyMissing = nil
-                local lowestExpUnit = nil
-                local lowestExp = 999999
+				-- Determine Right Click target & spell (Single target buffing: prioritize missing overrides, then missing class buffs)
+				local rightTarget = nil
+				local rightSpellName = ""
+				local inRangeSpecial = nil
+				local anySpecial = nil
+				local inRangeMissing = nil
+				local anyMissing = nil
+				local lowestExpUnit = nil
+				local lowestExp = 999999
 
-                for _, u in ipairs(classUnits) do
-                    if not u.isDead and u.isOnline and u.isVisible then
-                        local uStatus = Buffadin.BuffScanner.unitStatus[u.unitId]
-                        local hasBuff = uStatus and uStatus.hasBuff
-                        local isSpecial = uStatus and uStatus.isSpecial
+				for _, u in ipairs(classUnits) do
+					if not u.isDead and u.isOnline and u.isVisible then
+						local uStatus = Buffadin.BuffScanner.unitStatus[u.unitId]
+						local hasBuff = uStatus and uStatus.hasBuff
+						local isSpecial = uStatus and uStatus.isSpecial
 
-                        if not hasBuff then
-                            if isSpecial then
-                                if not anySpecial then anySpecial = u end
-                                local nIndex = Buffadin.Assignments:GetNormal(playerName, cls.id, u.name)
-                                local sId = (nIndex and Buffadin.NORMAL_BLESSINGS[nIndex]) and Buffadin.NORMAL_BLESSINGS[nIndex].spellId
-                                if Buffadin:IsUnitInRange(u.unitId, sId) then
-                                    inRangeSpecial = u
-                                    break
-                                end
-                            else
-                                if not anyMissing then anyMissing = u end
-                                if Buffadin:IsUnitInRange(u.unitId, gConfig and gConfig.spellId) then
-                                    inRangeMissing = u
-                                end
-                            end
-                        elseif uStatus and uStatus.expiration and uStatus.expiration < lowestExp then
-                            lowestExp = uStatus.expiration
-                            lowestExpUnit = u
-                        end
-                    end
-                end
+						if not hasBuff then
+							if isSpecial then
+								if not anySpecial then
+									anySpecial = u
+								end
+								local nIndex = Buffadin.Assignments:GetNormal(playerName, cls.id, u.name)
+								local sId = (nIndex and Buffadin.NORMAL_BLESSINGS[nIndex])
+									and Buffadin.NORMAL_BLESSINGS[nIndex].spellId
+								if Buffadin:IsUnitInRange(u.unitId, sId) then
+									inRangeSpecial = u
+									break
+								end
+							else
+								if not anyMissing then
+									anyMissing = u
+								end
+								if Buffadin:IsUnitInRange(u.unitId, gConfig and gConfig.spellId) then
+									inRangeMissing = u
+								end
+							end
+						elseif uStatus and uStatus.expiration and uStatus.expiration < lowestExp then
+							lowestExp = uStatus.expiration
+							lowestExpUnit = u
+						end
+					end
+				end
 
-                local chosenRightUnit = inRangeSpecial or anySpecial or inRangeMissing or anyMissing or lowestExpUnit or classUnits[1]
-                if chosenRightUnit then
-                    rightTarget = chosenRightUnit.unitId
-                    local nOverride = Buffadin.Assignments:GetNormal(playerName, cls.id, chosenRightUnit.name)
-                    if nOverride and nOverride > 0 and Buffadin.NORMAL_BLESSINGS[nOverride] then
-                        local oConfig = Buffadin.NORMAL_BLESSINGS[nOverride]
-                        rightSpellName = (oConfig.spellId > 0) and Buffadin:GetSpellName(oConfig.spellId) or ""
-                    else
-                        local nIndex = Buffadin.GREATER_TO_NORMAL[gIndex] or 0
-                        local nConfig = Buffadin.NORMAL_BLESSINGS[nIndex]
-                        rightSpellName = (nConfig and nConfig.spellId > 0) and Buffadin:GetSpellName(nConfig.spellId) or ""
-                    end
-                end
+				local chosenRightUnit = inRangeSpecial
+					or anySpecial
+					or inRangeMissing
+					or anyMissing
+					or lowestExpUnit
+					or classUnits[1]
+				if chosenRightUnit then
+					rightTarget = chosenRightUnit.unitId
+					local nOverride = Buffadin.Assignments:GetNormal(playerName, cls.id, chosenRightUnit.name)
+					if nOverride and nOverride > 0 and Buffadin.NORMAL_BLESSINGS[nOverride] then
+						local oConfig = Buffadin.NORMAL_BLESSINGS[nOverride]
+						rightSpellName = (oConfig.spellId > 0) and Buffadin:GetSpellName(oConfig.spellId) or ""
+					else
+						local nIndex = Buffadin.GREATER_TO_NORMAL[gIndex] or 0
+						local nConfig = Buffadin.NORMAL_BLESSINGS[nIndex]
+						rightSpellName = (nConfig and nConfig.spellId > 0) and Buffadin:GetSpellName(nConfig.spellId)
+							or ""
+					end
+				end
 
-                -- Determine Left Click target & spell
-                local leftTarget = nil
-                local leftSpellName = ""
+				-- Determine Left Click target & spell
+				local leftTarget = nil
+				local leftSpellName = ""
 
-                if gKnown and gSpellName ~= "" then
-                    leftSpellName = gSpellName
-                    for _, u in ipairs(classUnits) do
-                        if not u.isDead and u.isOnline and u.isVisible then
-                            if Buffadin:IsUnitInRange(u.unitId, gConfig and gConfig.spellId, leftSpellName) then
-                                leftTarget = u.unitId
-                                break
-                            end
-                            if not leftTarget then leftTarget = u.unitId end
-                        end
-                    end
-                    if not leftTarget and #classUnits > 0 then
-                        leftTarget = classUnits[1].unitId
-                    end
-                else
-                    -- Fallback to single normal blessing if Greater Blessing not learned
-                    leftSpellName = rightSpellName
-                    leftTarget = rightTarget
-                end
+				if gKnown and gSpellName ~= "" then
+					leftSpellName = gSpellName
+					for _, u in ipairs(classUnits) do
+						if not u.isDead and u.isOnline and u.isVisible then
+							if Buffadin:IsUnitInRange(u.unitId, gConfig and gConfig.spellId, leftSpellName) then
+								leftTarget = u.unitId
+								break
+							end
+							if not leftTarget then
+								leftTarget = u.unitId
+							end
+						end
+					end
+					if not leftTarget and #classUnits > 0 then
+						leftTarget = classUnits[1].unitId
+					end
+				else
+					-- Fallback to single normal blessing if Greater Blessing not learned
+					leftSpellName = rightSpellName
+					leftTarget = rightTarget
+				end
 
-                -- Configure Left Click
-                if leftSpellName ~= "" and leftTarget then
-                    btn:SetAttribute("type1", isMock and nil or "spell")
-                    btn:SetAttribute("spell1", leftSpellName)
-                    btn:SetAttribute("unit1", leftTarget)
-                else
-                    btn:SetAttribute("type1", nil)
-                    btn:SetAttribute("spell1", nil)
-                    btn:SetAttribute("unit1", nil)
-                end
-                btn:SetAttribute("shift-type1", "")
+				-- Configure Left Click
+				if leftSpellName ~= "" and leftTarget then
+					btn:SetAttribute("type1", isMock and nil or "spell")
+					btn:SetAttribute("spell1", leftSpellName)
+					btn:SetAttribute("unit1", leftTarget)
+				else
+					btn:SetAttribute("type1", nil)
+					btn:SetAttribute("spell1", nil)
+					btn:SetAttribute("unit1", nil)
+				end
+				btn:SetAttribute("shift-type1", "")
 
-                -- Configure Right Click: Single Normal Blessing (or Override)
-                if rightSpellName ~= "" and rightTarget then
-                    btn:SetAttribute("type2", isMock and nil or "spell")
-                    btn:SetAttribute("spell2", rightSpellName)
-                    btn:SetAttribute("unit2", rightTarget)
-                else
-                    btn:SetAttribute("type2", nil)
-                    btn:SetAttribute("spell2", nil)
-                    btn:SetAttribute("unit2", nil)
-                end
-                btn:SetAttribute("shift-type2", "")
-            end
-        end
-    end
+				-- Configure Right Click: Single Normal Blessing (or Override)
+				if rightSpellName ~= "" and rightTarget then
+					btn:SetAttribute("type2", isMock and nil or "spell")
+					btn:SetAttribute("spell2", rightSpellName)
+					btn:SetAttribute("unit2", rightTarget)
+				else
+					btn:SetAttribute("type2", nil)
+					btn:SetAttribute("spell2", nil)
+					btn:SetAttribute("unit2", nil)
+				end
+				btn:SetAttribute("shift-type2", "")
+			end
+		end
+	end
 
-    -- 2. Update Utility Buttons Visuals & Attributes
-    -- Auto-Buff Button
-    if self.autoButton and self.autoButton:IsShown() then
-        if inCombat then
-            self.autoButton.icon:SetTexture("Interface\\Icons\\Spell_Holy_GreaterBlessingofKings")
-            self.autoButton.icon:SetDesaturated(true)
-            self.autoButton.icon:SetVertexColor(0.45, 0.45, 0.45)
-            Buffadin.Theme:SetBorderStatus(self.autoButton, "Disabled")
-            self.autoButton.count:SetText("")
-            local isMock = Buffadin.MockHarness and Buffadin.MockHarness.active
-            if isMock then
-                self.autoButton:SetAttribute("type", nil)
-                self.autoButton:SetAttribute("type1", nil)
-                self.autoButton:SetAttribute("type2", nil)
-                self.autoButton:SetAttribute("spell1", nil)
-                self.autoButton:SetAttribute("unit1", nil)
-                self.autoButton:SetAttribute("spell2", nil)
-                self.autoButton:SetAttribute("unit2", nil)
-            end
-        else
-            self.autoButton.icon:SetDesaturated(false)
-            self.autoButton.icon:SetVertexColor(1, 1, 1)
+	-- 2. Update Utility Buttons Visuals & Attributes
+	-- Auto-Buff Button
+	if self.autoButton and self.autoButton:IsShown() then
+		if inCombat then
+			self.autoButton.icon:SetTexture("Interface\\Icons\\Spell_Holy_GreaterBlessingofKings")
+			self.autoButton.icon:SetDesaturated(true)
+			self.autoButton.icon:SetVertexColor(0.45, 0.45, 0.45)
+			Buffadin.Theme:SetBorderStatus(self.autoButton, "Disabled")
+			self.autoButton.count:SetText("")
+			local isMock = Buffadin.MockHarness and Buffadin.MockHarness.active
+			if isMock then
+				self.autoButton:SetAttribute("type", nil)
+				self.autoButton:SetAttribute("type1", nil)
+				self.autoButton:SetAttribute("type2", nil)
+				self.autoButton:SetAttribute("spell1", nil)
+				self.autoButton:SetAttribute("unit1", nil)
+				self.autoButton:SetAttribute("spell2", nil)
+				self.autoButton:SetAttribute("unit2", nil)
+			end
+		else
+			self.autoButton.icon:SetDesaturated(false)
+			self.autoButton.icon:SetVertexColor(1, 1, 1)
 
-            local targetUnit, gSpellId, nSpellId, isGreater, bestClassId, reasonText = Buffadin.BuffScanner:GetNextAutoBuff()
-            local activeSpellId = (gSpellId and gSpellId > 0) and gSpellId or (nSpellId or 0)
+			local targetUnit, gSpellId, nSpellId, isGreater, bestClassId, reasonText =
+				Buffadin.BuffScanner:GetNextAutoBuff()
+			local activeSpellId = (gSpellId and gSpellId > 0) and gSpellId or (nSpellId or 0)
 
-            if activeSpellId > 0 and targetUnit then
-                local spellTex = Buffadin:GetSpellTexture(activeSpellId)
-                if spellTex and spellTex ~= "" then
-                    self.autoButton.icon:SetTexture(spellTex)
-                end
-                Buffadin.Theme:SetBorderStatus(self.autoButton, "Some")
+			if activeSpellId > 0 and targetUnit then
+				local spellTex = Buffadin:GetSpellTexture(activeSpellId)
+				if spellTex and spellTex ~= "" then
+					self.autoButton.icon:SetTexture(spellTex)
+				end
+				Buffadin.Theme:SetBorderStatus(self.autoButton, "Some")
 
-                local isMock = Buffadin.MockHarness and Buffadin.MockHarness.active
-                local gKnown = (gSpellId and gSpellId > 0) and Buffadin:IsSpellKnown(gSpellId)
-                local leftSpellName = (gKnown and gSpellId > 0) and Buffadin:GetSpellName(gSpellId) or ((nSpellId and nSpellId > 0) and Buffadin:GetSpellName(nSpellId) or "")
-                local rightSpellName = (nSpellId and nSpellId > 0) and Buffadin:GetSpellName(nSpellId) or leftSpellName
+				local isMock = Buffadin.MockHarness and Buffadin.MockHarness.active
+				local gKnown = (gSpellId and gSpellId > 0) and Buffadin:IsSpellKnown(gSpellId)
+				local leftSpellName = (gKnown and gSpellId > 0) and Buffadin:GetSpellName(gSpellId)
+					or ((nSpellId and nSpellId > 0) and Buffadin:GetSpellName(nSpellId) or "")
+				local rightSpellName = (nSpellId and nSpellId > 0) and Buffadin:GetSpellName(nSpellId) or leftSpellName
 
-                -- Left Click: Greater (or Normal if unlearned)
-                if leftSpellName ~= "" then
-                    self.autoButton:SetAttribute("type1", isMock and nil or "spell")
-                    self.autoButton:SetAttribute("spell1", leftSpellName)
-                    self.autoButton:SetAttribute("unit1", targetUnit)
-                else
-                    self.autoButton:SetAttribute("type1", nil)
-                    self.autoButton:SetAttribute("spell1", nil)
-                    self.autoButton:SetAttribute("unit1", nil)
-                end
+				-- Left Click: Greater (or Normal if unlearned)
+				if leftSpellName ~= "" then
+					self.autoButton:SetAttribute("type1", isMock and nil or "spell")
+					self.autoButton:SetAttribute("spell1", leftSpellName)
+					self.autoButton:SetAttribute("unit1", targetUnit)
+				else
+					self.autoButton:SetAttribute("type1", nil)
+					self.autoButton:SetAttribute("spell1", nil)
+					self.autoButton:SetAttribute("unit1", nil)
+				end
 
-                -- Right Click: Always Normal Blessing
-                if rightSpellName ~= "" then
-                    self.autoButton:SetAttribute("type2", isMock and nil or "spell")
-                    self.autoButton:SetAttribute("spell2", rightSpellName)
-                    self.autoButton:SetAttribute("unit2", targetUnit)
-                else
-                    self.autoButton:SetAttribute("type2", nil)
-                    self.autoButton:SetAttribute("spell2", nil)
-                    self.autoButton:SetAttribute("unit2", nil)
-                end
-            else
-                self.autoButton.icon:SetTexture("Interface\\Icons\\Spell_Holy_GreaterBlessingofKings")
-                Buffadin.Theme:SetBorderStatus(self.autoButton, "Good")
-                self.autoButton:SetAttribute("type1", nil)
-                self.autoButton:SetAttribute("spell1", nil)
-                self.autoButton:SetAttribute("unit1", nil)
-                self.autoButton:SetAttribute("type2", nil)
-                self.autoButton:SetAttribute("spell2", nil)
-                self.autoButton:SetAttribute("unit2", nil)
-            end
-        end
-    end
+				-- Right Click: Always Normal Blessing
+				if rightSpellName ~= "" then
+					self.autoButton:SetAttribute("type2", isMock and nil or "spell")
+					self.autoButton:SetAttribute("spell2", rightSpellName)
+					self.autoButton:SetAttribute("unit2", targetUnit)
+				else
+					self.autoButton:SetAttribute("type2", nil)
+					self.autoButton:SetAttribute("spell2", nil)
+					self.autoButton:SetAttribute("unit2", nil)
+				end
+			else
+				self.autoButton.icon:SetTexture("Interface\\Icons\\Spell_Holy_GreaterBlessingofKings")
+				Buffadin.Theme:SetBorderStatus(self.autoButton, "Good")
+				self.autoButton:SetAttribute("type1", nil)
+				self.autoButton:SetAttribute("spell1", nil)
+				self.autoButton:SetAttribute("unit1", nil)
+				self.autoButton:SetAttribute("type2", nil)
+				self.autoButton:SetAttribute("spell2", nil)
+				self.autoButton:SetAttribute("unit2", nil)
+			end
+		end
+	end
 
-    -- Aura Button
-    if self.auraButton and self.auraButton:IsShown() then
-        local auraIndex = Buffadin.Assignments:GetAura(playerName)
-        local aInfo = Buffadin.AURAS[auraIndex]
-        if aInfo and aInfo.spellId > 0 then
-            self.auraButton.icon:SetTexture(aInfo.icon)
-            local hasAura = Buffadin.BuffScanner.selfStatus.hasAura
-            Buffadin.Theme:SetBorderStatus(self.auraButton, hasAura and "Good" or "All")
-            if not inCombat then
-                local isMock = Buffadin.MockHarness and Buffadin.MockHarness.active
-                local aName = Buffadin:GetSpellName(aInfo.spellId)
-                self.auraButton:SetAttribute("type", isMock and nil or "spell")
-                self.auraButton:SetAttribute("spell", aName)
-                self.auraButton:SetAttribute("unit", "player")
-                self.auraButton:SetAttribute("shift-type", "")
-                self.auraButton:SetAttribute("shift-type1", "")
-                self.auraButton:SetAttribute("shift-type2", "")
-            end
-        else
-            self.auraButton.icon:SetTexture(Buffadin.AURAS[0].icon)
-            Buffadin.Theme:SetBorderStatus(self.auraButton, "Disabled")
-            if not inCombat then
-                self.auraButton:SetAttribute("type", nil)
-                self.auraButton:SetAttribute("spell", nil)
-                self.auraButton:SetAttribute("unit", nil)
-                self.auraButton:SetAttribute("shift-type", "")
-                self.auraButton:SetAttribute("shift-type1", "")
-                self.auraButton:SetAttribute("shift-type2", "")
-            end
-        end
-    end
+	-- Aura Button
+	if self.auraButton and self.auraButton:IsShown() then
+		local auraIndex = Buffadin.Assignments:GetAura(playerName)
+		local aInfo = Buffadin.AURAS[auraIndex]
+		if aInfo and aInfo.spellId > 0 then
+			self.auraButton.icon:SetTexture(aInfo.icon)
+			local hasAura = Buffadin.BuffScanner.selfStatus.hasAura
+			Buffadin.Theme:SetBorderStatus(self.auraButton, hasAura and "Good" or "All")
+			if not inCombat then
+				local isMock = Buffadin.MockHarness and Buffadin.MockHarness.active
+				local aName = Buffadin:GetSpellName(aInfo.spellId)
+				self.auraButton:SetAttribute("type", isMock and nil or "spell")
+				self.auraButton:SetAttribute("spell", aName)
+				self.auraButton:SetAttribute("unit", "player")
+				self.auraButton:SetAttribute("shift-type", "")
+				self.auraButton:SetAttribute("shift-type1", "")
+				self.auraButton:SetAttribute("shift-type2", "")
+			end
+		else
+			self.auraButton.icon:SetTexture(Buffadin.AURAS[0].icon)
+			Buffadin.Theme:SetBorderStatus(self.auraButton, "Disabled")
+			if not inCombat then
+				self.auraButton:SetAttribute("type", nil)
+				self.auraButton:SetAttribute("spell", nil)
+				self.auraButton:SetAttribute("unit", nil)
+				self.auraButton:SetAttribute("shift-type", "")
+				self.auraButton:SetAttribute("shift-type1", "")
+				self.auraButton:SetAttribute("shift-type2", "")
+			end
+		end
+	end
 
-    -- Righteous Fury Button
-    if self.rfButton and self.rfButton:IsShown() then
-        local hasRF = Buffadin.BuffScanner.selfStatus.hasRighteousFury
-        Buffadin.Theme:SetBorderStatus(self.rfButton, hasRF and "Good" or "Disabled")
-        if not inCombat then
-            local isMock = Buffadin.MockHarness and Buffadin.MockHarness.active
-            local rfName = Buffadin:GetSpellName(Buffadin.RIGHTEOUS_FURY.spellId)
-            self.rfButton:SetAttribute("type", isMock and nil or "spell")
-            self.rfButton:SetAttribute("spell", rfName)
-            self.rfButton:SetAttribute("unit", "player")
-        end
-    end
+	-- Righteous Fury Button
+	if self.rfButton and self.rfButton:IsShown() then
+		local hasRF = Buffadin.BuffScanner.selfStatus.hasRighteousFury
+		Buffadin.Theme:SetBorderStatus(self.rfButton, hasRF and "Good" or "Disabled")
+		if not inCombat then
+			local isMock = Buffadin.MockHarness and Buffadin.MockHarness.active
+			local rfName = Buffadin:GetSpellName(Buffadin.RIGHTEOUS_FURY.spellId)
+			self.rfButton:SetAttribute("type", isMock and nil or "spell")
+			self.rfButton:SetAttribute("spell", rfName)
+			self.rfButton:SetAttribute("unit", "player")
+		end
+	end
 end
