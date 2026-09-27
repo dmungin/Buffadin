@@ -10,7 +10,7 @@
 
 **Floating Blessing Bar**
 
-<img width="509" height="72" alt="image" src="https://github.com/user-attachments/assets/b5ef04bb-5c35-41d9-aec6-8ccd2d1f71dc" />
+<img width="602" height="77" alt="image" src="https://github.com/user-attachments/assets/8722f1fb-2724-4577-a59d-f55e798de173" />
 
 **Raid & Party Assignment Matrix**
 
@@ -19,11 +19,12 @@
 **Single-Target Player Overrides**
 
 <img width="311" height="592" alt="image" src="https://github.com/user-attachments/assets/611a730f-2aa6-42d1-b3db-44c6cae60385" />
-<img width="814" height="498" alt="image" src="https://github.com/user-attachments/assets/18b9ff36-c2cc-4c70-9b5e-b2a63394ecc6" />
+<img width="640" height="467" alt="image" src="https://github.com/user-attachments/assets/319272ea-f071-4fe5-8a4a-22eeafd29b54" />
+
 
 **Smart Target & Auto-Buff Solver (Out of Combat)**
 
-<img width="423" height="279" alt="image" src="https://github.com/user-attachments/assets/b62d8511-b900-44b6-95a7-a72a7cd938e1" />
+<img width="775" height="277" alt="image" src="https://github.com/user-attachments/assets/9d0d663e-f61a-4c2d-a4ca-5e50b9e82148" />
 
 - Priority-based one-click buffing button that dynamically calculates and targets the next player needing a blessing (missing self-aura, class with the most missing buffs, expiring buffs, or custom single-target overrides).
 - **Out of Combat Only**: Due to World of Warcraft's combat lockdown restrictions on secure action buttons, smart auto-targeting is strictly out of combat. During combat, the button is automatically disabled and greyed out to prevent mis-targeting. As soon as combat drops, the button immediately reactivates with the next optimal target.
