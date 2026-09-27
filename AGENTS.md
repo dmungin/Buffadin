@@ -176,6 +176,7 @@ There is no headless test runner. The WoW API isn't available outside the client
 ## Versioning and release
 
 - Version appears in **two places**: `## Version:` in `Buffadin.toc` and `Buffadin.version` in `Core/Compat.lua`. Bump both together (commit style: `chore: bump version to X.Y.Z`).
+- **Always bump the version when opening a PR.** Increment patch (`0.1.X`) for fixes/chores, or minor (`0.X.0`) for new features and UI changes.
 - Release = push an annotated tag `vX.Y.Z`. CI runs `BigWigsMods/packager@v2` and uploads to CurseForge (project `1710274`) and GitHub Releases. Only tag when the user asks.
 - Anything dev-only must be excluded from the package: add it to `pkgmeta.yaml` `ignore:` and `.gitattributes` `export-ignore`, or wrap `.toc` entries in `#@debug@`.
 
@@ -197,3 +198,4 @@ There is no headless test runner. The WoW API isn't available outside the client
 - [ ] Sync message format stays backward compatible?
 - [ ] Every `.lua` file passes `luac5.1 -p`?
 - [ ] Slash command help text and README updated if commands changed?
+- [ ] Version bumped in both `Buffadin.toc` and `Core/Compat.lua` for this PR?
