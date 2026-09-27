@@ -8,7 +8,7 @@ Buffadin is a **World of Warcraft addon** (Lua 5.1, WoW FrameXML API) that manag
 
 - No build step, no dependencies, no embedded libraries (no Ace3/LibStub). Everything is hand-written against the raw WoW API.
 - No automated test suite. Testing happens in-game (see [Testing](#testing)).
-- Released to CurseForge + GitHub Releases by the BigWigs packager on tag push.
+- Released to CurseForge + GitHub Releases by the BigWigs packager when a version bump merges to `main`.
 
 ## Repository layout
 
@@ -31,7 +31,7 @@ UI/
 Dev/
   MockHarness.lua     In-game simulated party/raid + control panel (debug builds only)
 pkgmeta.yaml          Packager ignore list
-.github/workflows/publish.yml   Tag-triggered BigWigsMods/packager release
+.github/workflows/publish.yml   On merge to main: tag new version, then BigWigsMods/packager release
 ```
 
 ## Architecture
@@ -177,7 +177,8 @@ There is no headless test runner. The WoW API isn't available outside the client
 
 - Version appears in **two places**: `## Version:` in `Buffadin.toc` and `Buffadin.version` in `Core/Compat.lua`. Bump both together (commit style: `chore: bump version to X.Y.Z`).
 - **Always bump the version when opening a PR.** Increment patch (`0.1.X`) for fixes/chores, or minor (`0.X.0`) for new features and UI changes.
-- Release = push an annotated tag `vX.Y.Z`. CI runs `BigWigsMods/packager@v2` and uploads to CurseForge (project `1710274`) and GitHub Releases. Only tag when the user asks.
+- Releases are automatic. On every push to `main` (i.e. a merged PR), `publish.yml` reads the version from `Buffadin.toc`, fails if it doesn't match `Core/Compat.lua`, and, if tag `vX.Y.Z` doesn't exist yet, creates and pushes that annotated tag and runs `BigWigsMods/packager@v2` to upload to CurseForge (project `1710274`) and GitHub Releases. If the tag already exists, nothing is published. Merging a PR with a version bump therefore ships a release. It can also be run manually from the Actions tab (`workflow_dispatch`) with the same logic.
+- Don't create or push release tags by hand. Pushed tags no longer trigger the workflow.
 - Anything dev-only must be excluded from the package: add it to `pkgmeta.yaml` `ignore:` and `.gitattributes` `export-ignore`, or wrap `.toc` entries in `#@debug@`.
 
 ## Git workflow
