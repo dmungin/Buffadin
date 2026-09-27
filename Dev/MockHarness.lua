@@ -46,10 +46,10 @@ function Mock:LoadPreset(preset)
     if preset == "PARTY" then
         local list = {
             CreateMockUnit("player", playerName, "PALADIN", false, true, false, true),
-            CreateMockUnit("party1", "Gorok", "WARRIOR", true, false, false, false),       -- Tank
-            CreateMockUnit("party2", "Pyromaniac", "MAGE", false, false, false, false),
-            CreateMockUnit("party3", "Shadowstep", "ROGUE", false, false, false, false),
-            CreateMockUnit("party4", "Holyheals", "PRIEST", false, false, false, false),
+            CreateMockUnit("party1", "Gorok Stonehammer", "WARRIOR", true, false, false, false),       -- Tank
+            CreateMockUnit("party2", "Pyromaniac Emberforge", "MAGE", false, false, false, false),
+            CreateMockUnit("party3", "Shadowstep Nightwhisper", "ROGUE", false, false, false, false),
+            CreateMockUnit("party4", "Holyheals Brightwater", "PRIEST", false, false, false, false),
         }
         for _, u in ipairs(list) do
             self.mockUnits[u.unitId] = u
@@ -60,39 +60,39 @@ function Mock:LoadPreset(preset)
         local list = {
             -- Paladins (3)
             CreateMockUnit("player", playerName, "PALADIN", false, true, false, true),
-            CreateMockUnit("raid1", "Uther", "PALADIN", false, false, true, false),
-            CreateMockUnit("raid2", "Tirion", "PALADIN", false, false, false, false),
+            CreateMockUnit("raid1", "Uther Lightbringer", "PALADIN", false, false, true, false),
+            CreateMockUnit("raid2", "Tirion Fordring", "PALADIN", false, false, false, false),
             -- Tanks (2)
-            CreateMockUnit("raid3", "Gorok", "WARRIOR", true, false, false, false),        -- Main Tank
-            CreateMockUnit("raid4", "Ironbark", "DRUID", true, false, false, false),       -- Off Tank
+            CreateMockUnit("raid3", "Gorok Stonehammer", "WARRIOR", true, false, false, false),        -- Main Tank
+            CreateMockUnit("raid4", "Ironbark Oakenshield", "DRUID", true, false, false, false),       -- Off Tank
             -- Warriors DPS (3)
-            CreateMockUnit("raid5", "Bladestorm", "WARRIOR", false, false, false, false),
-            CreateMockUnit("raid6", "Rend", "WARRIOR", false, false, false, false),
-            CreateMockUnit("raid7", "Execute", "WARRIOR", false, false, false, false),
+            CreateMockUnit("raid5", "Bladestorm Thunderfist", "WARRIOR", false, false, false, false),
+            CreateMockUnit("raid6", "Rend Ash", "WARRIOR", false, false, false, false),
+            CreateMockUnit("raid7", "Execute Grimsteel", "WARRIOR", false, false, false, false),
             -- Rogues (3)
-            CreateMockUnit("raid8", "Shadowstep", "ROGUE", false, false, false, false),
-            CreateMockUnit("raid9", "Sneak", "ROGUE", false, false, false, false),
-            CreateMockUnit("raid10", "Daggerfall", "ROGUE", false, false, false, false),
+            CreateMockUnit("raid8", "Shadowstep Nightwhisper", "ROGUE", false, false, false, false),
+            CreateMockUnit("raid9", "Sneak Vo", "ROGUE", false, false, false, false),
+            CreateMockUnit("raid10", "Daggerfall Silvershade", "ROGUE", false, false, false, false),
             -- Mages (3)
-            CreateMockUnit("raid11", "Pyromaniac", "MAGE", false, false, false, false),
-            CreateMockUnit("raid12", "Frostbite", "MAGE", false, false, false, false),
-            CreateMockUnit("raid13", "Arcanist", "MAGE", false, false, false, false),
+            CreateMockUnit("raid11", "Pyromaniac Emberforge", "MAGE", false, false, false, false),
+            CreateMockUnit("raid12", "Frostbite Winterborne", "MAGE", false, false, false, false),
+            CreateMockUnit("raid13", "Arcanist Starweaver", "MAGE", false, false, false, false),
             -- Warlocks (3)
-            CreateMockUnit("raid14", "Doombringer", "WARLOCK", false, false, false, false),
-            CreateMockUnit("raid15", "Chaosbolt", "WARLOCK", false, false, false, false),
-            CreateMockUnit("raid16", "Felhound", "WARLOCK", false, false, false, false),
+            CreateMockUnit("raid14", "Doombringer Ashenwhisper", "WARLOCK", false, false, false, false),
+            CreateMockUnit("raid15", "Chaosbolt Felscorch", "WARLOCK", false, false, false, false),
+            CreateMockUnit("raid16", "Felhound Darkmantle", "WARLOCK", false, false, false, false),
             -- Hunters (3)
-            CreateMockUnit("raid17", "Aimshot", "HUNTER", false, false, false, false),
-            CreateMockUnit("raid18", "Trueshot", "HUNTER", false, false, false, false),
-            CreateMockUnit("raid19", "Beastmaster", "HUNTER", false, false, false, false),
+            CreateMockUnit("raid17", "Aimshot Hawkeye", "HUNTER", false, false, false, false),
+            CreateMockUnit("raid18", "Trueshot Windrunner", "HUNTER", false, false, false, false),
+            CreateMockUnit("raid19", "Beastmaster Thunderhorne", "HUNTER", false, false, false, false),
             -- Priests (3)
-            CreateMockUnit("raid20", "Holyheals", "PRIEST", false, false, false, false),
-            CreateMockUnit("raid21", "Shadowform", "PRIEST", false, false, false, false),
-            CreateMockUnit("raid22", "Discipline", "PRIEST", false, false, false, false),
+            CreateMockUnit("raid20", "Holyheals Brightwater", "PRIEST", false, false, false, false),
+            CreateMockUnit("raid21", "Shadowform Voidwalker", "PRIEST", false, false, false, false),
+            CreateMockUnit("raid22", "Discipline Kel", "PRIEST", false, false, false, false),
             -- Druids (1)
-            CreateMockUnit("raid23", "Moonkin", "DRUID", false, false, false, false),
+            CreateMockUnit("raid23", "Moonkin Starglade", "DRUID", false, false, false, false),
             -- Shamans (1)
-            CreateMockUnit("raid24", "Windfury", "SHAMAN", false, false, false, false),
+            CreateMockUnit("raid24", "Windfury Stormcaller", "SHAMAN", false, false, false, false),
         }
         for _, u in ipairs(list) do
             self.mockUnits[u.unitId] = u
@@ -103,54 +103,54 @@ function Mock:LoadPreset(preset)
         local list = {
             -- Paladins (4)
             CreateMockUnit("player", playerName, "PALADIN", false, true, false, true),
-            CreateMockUnit("raid1", "Uther", "PALADIN", false, false, true, false),
-            CreateMockUnit("raid2", "Tirion", "PALADIN", false, false, false, false),
-            CreateMockUnit("raid3", "Turalyon", "PALADIN", false, false, false, false),
+            CreateMockUnit("raid1", "Uther Lightbringer", "PALADIN", false, false, true, false),
+            CreateMockUnit("raid2", "Tirion Fordring", "PALADIN", false, false, false, false),
+            CreateMockUnit("raid3", "Turalyon Dawnblade", "PALADIN", false, false, false, false),
             -- Tanks (3)
-            CreateMockUnit("raid4", "Gorok", "WARRIOR", true, false, false, false),        -- Main Tank
-            CreateMockUnit("raid5", "Stonecleave", "WARRIOR", true, false, false, false),  -- Off Tank 1
-            CreateMockUnit("raid6", "Ironbark", "DRUID", true, false, false, false),       -- Off Tank 2
+            CreateMockUnit("raid4", "Gorok Stonehammer", "WARRIOR", true, false, false, false),        -- Main Tank
+            CreateMockUnit("raid5", "Stonecleave Blackanvil", "WARRIOR", true, false, false, false),  -- Off Tank 1
+            CreateMockUnit("raid6", "Ironbark Oakenshield", "DRUID", true, false, false, false),       -- Off Tank 2
             -- Warriors DPS (5)
-            CreateMockUnit("raid7", "Bladestorm", "WARRIOR", false, false, false, false),
-            CreateMockUnit("raid8", "Rend", "WARRIOR", false, false, false, false),
-            CreateMockUnit("raid9", "Execute", "WARRIOR", false, false, false, false),
-            CreateMockUnit("raid10", "Cleaver", "WARRIOR", false, false, false, false),
-            CreateMockUnit("raid11", "Sundered", "WARRIOR", false, false, false, false),
+            CreateMockUnit("raid7", "Bladestorm Thunderfist", "WARRIOR", false, false, false, false),
+            CreateMockUnit("raid8", "Rend Ash", "WARRIOR", false, false, false, false),
+            CreateMockUnit("raid9", "Execute Grimsteel", "WARRIOR", false, false, false, false),
+            CreateMockUnit("raid10", "Cleaver Bonebreaker", "WARRIOR", false, false, false, false),
+            CreateMockUnit("raid11", "Sundered Ironhide", "WARRIOR", false, false, false, false),
             -- Rogues (5)
-            CreateMockUnit("raid12", "Shadowstep", "ROGUE", false, false, false, false),
-            CreateMockUnit("raid13", "Sneak", "ROGUE", false, false, false, false),
-            CreateMockUnit("raid14", "Daggerfall", "ROGUE", false, false, false, false),
-            CreateMockUnit("raid15", "Backstab", "ROGUE", false, false, false, false),
-            CreateMockUnit("raid16", "Ambush", "ROGUE", false, false, false, false),
+            CreateMockUnit("raid12", "Shadowstep Nightwhisper", "ROGUE", false, false, false, false),
+            CreateMockUnit("raid13", "Sneak Vo", "ROGUE", false, false, false, false),
+            CreateMockUnit("raid14", "Daggerfall Silvershade", "ROGUE", false, false, false, false),
+            CreateMockUnit("raid15", "Backstab Duskwalker", "ROGUE", false, false, false, false),
+            CreateMockUnit("raid16", "Ambush Quickblade", "ROGUE", false, false, false, false),
             -- Mages (5)
-            CreateMockUnit("raid17", "Pyromaniac", "MAGE", false, false, false, false),
-            CreateMockUnit("raid18", "Frostbite", "MAGE", false, false, false, false),
-            CreateMockUnit("raid19", "Arcanist", "MAGE", false, false, false, false),
-            CreateMockUnit("raid20", "Ignite", "MAGE", false, false, false, false),
-            CreateMockUnit("raid21", "Blizzard", "MAGE", false, false, false, false),
+            CreateMockUnit("raid17", "Pyromaniac Emberforge", "MAGE", false, false, false, false),
+            CreateMockUnit("raid18", "Frostbite Winterborne", "MAGE", false, false, false, false),
+            CreateMockUnit("raid19", "Arcanist Starweaver", "MAGE", false, false, false, false),
+            CreateMockUnit("raid20", "Ignite Flameheart", "MAGE", false, false, false, false),
+            CreateMockUnit("raid21", "Blizzard Icevein", "MAGE", false, false, false, false),
             -- Warlocks (4)
-            CreateMockUnit("raid22", "Doombringer", "WARLOCK", false, false, false, false),
-            CreateMockUnit("raid23", "Chaosbolt", "WARLOCK", false, false, false, false),
-            CreateMockUnit("raid24", "Felhound", "WARLOCK", false, false, false, false),
-            CreateMockUnit("raid25", "Soulfire", "WARLOCK", false, false, false, false),
+            CreateMockUnit("raid22", "Doombringer Ashenwhisper", "WARLOCK", false, false, false, false),
+            CreateMockUnit("raid23", "Chaosbolt Felscorch", "WARLOCK", false, false, false, false),
+            CreateMockUnit("raid24", "Felhound Darkmantle", "WARLOCK", false, false, false, false),
+            CreateMockUnit("raid25", "Soulfire Grimshadow", "WARLOCK", false, false, false, false),
             -- Hunters (4)
-            CreateMockUnit("raid26", "Aimshot", "HUNTER", false, false, false, false),
-            CreateMockUnit("raid27", "Trueshot", "HUNTER", false, false, false, false),
-            CreateMockUnit("raid28", "Beastmaster", "HUNTER", false, false, false, false),
-            CreateMockUnit("raid29", "MultiShot", "HUNTER", false, false, false, false),
+            CreateMockUnit("raid26", "Aimshot Hawkeye", "HUNTER", false, false, false, false),
+            CreateMockUnit("raid27", "Trueshot Windrunner", "HUNTER", false, false, false, false),
+            CreateMockUnit("raid28", "Beastmaster Thunderhorne", "HUNTER", false, false, false, false),
+            CreateMockUnit("raid29", "MultiShot Swiftarrow", "HUNTER", false, false, false, false),
             -- Priests (5)
-            CreateMockUnit("raid30", "Holyheals", "PRIEST", false, false, false, false),
-            CreateMockUnit("raid31", "Shadowform", "PRIEST", false, false, false, false),
-            CreateMockUnit("raid32", "Discipline", "PRIEST", false, false, false, false),
-            CreateMockUnit("raid33", "Powerword", "PRIEST", false, false, false, false),
-            CreateMockUnit("raid34", "Renew", "PRIEST", false, false, false, false),
+            CreateMockUnit("raid30", "Holyheals Brightwater", "PRIEST", false, false, false, false),
+            CreateMockUnit("raid31", "Shadowform Voidwalker", "PRIEST", false, false, false, false),
+            CreateMockUnit("raid32", "Discipline Kel", "PRIEST", false, false, false, false),
+            CreateMockUnit("raid33", "Powerword Faithmender", "PRIEST", false, false, false, false),
+            CreateMockUnit("raid34", "Renew Lightwell", "PRIEST", false, false, false, false),
             -- Druids (3)
-            CreateMockUnit("raid35", "Moonkin", "DRUID", false, false, false, false),
-            CreateMockUnit("raid36", "Regrowth", "DRUID", false, false, false, false),
-            CreateMockUnit("raid37", "Tranquil", "DRUID", false, false, false, false),
+            CreateMockUnit("raid35", "Moonkin Starglade", "DRUID", false, false, false, false),
+            CreateMockUnit("raid36", "Regrowth Leafsong", "DRUID", false, false, false, false),
+            CreateMockUnit("raid37", "Tranquil Moonshadow", "DRUID", false, false, false, false),
             -- Shamans (2)
-            CreateMockUnit("raid38", "Windfury", "SHAMAN", false, false, false, false),
-            CreateMockUnit("raid39", "Chainheal", "SHAMAN", false, false, false, false),
+            CreateMockUnit("raid38", "Windfury Stormcaller", "SHAMAN", false, false, false, false),
+            CreateMockUnit("raid39", "Chainheal Earthbinder", "SHAMAN", false, false, false, false),
         }
         for _, u in ipairs(list) do
             self.mockUnits[u.unitId] = u
@@ -671,16 +671,16 @@ end
 
 function Mock:ToggleTankOverride()
     local pallyName = UnitName("player") or "Player"
-    local current = Buffadin.Assignments:GetNormal(pallyName, 1, "Gorok")
+    local current = Buffadin.Assignments:GetNormal(pallyName, 1, "Gorok Stonehammer")
 
     if current == 6 then
-        Buffadin.Assignments:SetNormal(pallyName, 1, "Gorok", 0)
-        self:LogEvent("SYSTEM", "Tank Override", "Gorok (Warrior)", "Cleared override (reverted to class default)")
-        Buffadin:Print("Mock: Cleared Tank override on Gorok (reset to class default).")
+        Buffadin.Assignments:SetNormal(pallyName, 1, "Gorok Stonehammer", 0)
+        self:LogEvent("SYSTEM", "Tank Override", "Gorok Stonehammer (Warrior)", "Cleared override (reverted to class default)")
+        Buffadin:Print("Mock: Cleared Tank override on Gorok Stonehammer (reset to class default).")
     else
-        Buffadin.Assignments:SetNormal(pallyName, 1, "Gorok", 6) -- Sanctuary = 6
-        self:LogEvent("SYSTEM", "Tank Override", "Gorok (Warrior)", "Set override to [Blessing of Sanctuary]")
-        Buffadin:Print("Mock: Set Gorok (Tank) override to [Blessing of Sanctuary]!")
+        Buffadin.Assignments:SetNormal(pallyName, 1, "Gorok Stonehammer", 6) -- Sanctuary = 6
+        self:LogEvent("SYSTEM", "Tank Override", "Gorok Stonehammer (Warrior)", "Set override to [Blessing of Sanctuary]")
+        Buffadin:Print("Mock: Set Gorok Stonehammer (Tank) override to [Blessing of Sanctuary]!")
     end
 
     Buffadin.BuffScanner:Scan()
