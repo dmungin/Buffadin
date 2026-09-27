@@ -318,6 +318,23 @@ function Mock:SetUnitBuff(unitId, spellId, spellName, isGreater, duration)
         expires = now + duration,
         duration = duration,
     }
+    if Buffadin.BuffScanner and Buffadin.BuffScanner.unitStatus then
+        local uStatus = Buffadin.BuffScanner.unitStatus[unitId]
+        if not uStatus then
+            Buffadin.BuffScanner.unitStatus[unitId] = {
+                assignedGSpellId = 0,
+                assignedNSpellId = 0,
+                assignedSpellName = spellName or "Blessing",
+                isSpecial = false,
+            }
+            uStatus = Buffadin.BuffScanner.unitStatus[unitId]
+        end
+        uStatus.hasBuff = true
+        uStatus.expiration = duration
+        uStatus.absExpiration = now + duration
+        uStatus.assignedSpellName = (spellName and spellName ~= "") and spellName or uStatus.assignedSpellName
+        uStatus.diedInCombat = false
+    end
 end
 
 function Mock:ClearUnitBuff(unitId)
@@ -328,6 +345,12 @@ function Mock:ClearUnitBuff(unitId)
         expires = 0,
         duration = 0,
     }
+    if Buffadin.BuffScanner and Buffadin.BuffScanner.unitStatus and Buffadin.BuffScanner.unitStatus[unitId] then
+        local uStatus = Buffadin.BuffScanner.unitStatus[unitId]
+        uStatus.hasBuff = false
+        uStatus.expiration = 0
+        uStatus.absExpiration = 0
+    end
 end
 
 function Mock:InitializeBuffStates()
@@ -516,10 +539,29 @@ function Mock:HookInteractiveButtons()
                 if button == "LeftButton" then
                     local spell = bSelf:GetAttribute("spell1")
                     local unit = bSelf:GetAttribute("unit1")
+                    if (not spell or not unit) and bSelf.classId then
+                        local cid = bSelf.classId
+                        local pName = UnitName("player") or "Player"
+                        local gIdx = Buffadin.Assignments:GetGreater(pName, cid)
+                        local gCfg = Buffadin.GREATER_BLESSINGS[gIdx]
+                        spell = gCfg and gCfg.name
+                        local cUnits = Buffadin.Roster.classes[cid]
+                        unit = cUnits and cUnits[1] and cUnits[1].unitId
+                    end
                     Mock:PerformSimulatedCast(spell, unit, "CLASS")
                 elseif button == "RightButton" then
                     local spell = bSelf:GetAttribute("spell2")
                     local unit = bSelf:GetAttribute("unit2")
+                    if (not spell or not unit) and bSelf.classId then
+                        local cid = bSelf.classId
+                        local pName = UnitName("player") or "Player"
+                        local gIdx = Buffadin.Assignments:GetGreater(pName, cid)
+                        local nIdx = Buffadin.GREATER_TO_NORMAL[gIdx] or 0
+                        local nCfg = Buffadin.NORMAL_BLESSINGS[nIdx]
+                        spell = nCfg and nCfg.name
+                        local cUnits = Buffadin.Roster.classes[cid]
+                        unit = cUnits and cUnits[1] and cUnits[1].unitId
+                    end
                     Mock:PerformSimulatedCast(spell, unit, "NORMAL")
                 end
             end)

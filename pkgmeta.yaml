@@ -4,3 +4,6 @@ ignore:
   - .gitattributes
   - .gitignore
   - .github
+  - AGENTS.md
+  - CLAUDE.md
+  - GEMINI.md
