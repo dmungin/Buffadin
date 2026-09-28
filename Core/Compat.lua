@@ -1,7 +1,7 @@
 local addonName, Buffadin = ...
 _G["Buffadin"] = Buffadin
 
-Buffadin.version = "0.2.2"
+Buffadin.version = "0.2.3"
 Buffadin.addonName = addonName
 Buffadin.combatQueue = {}
 
