@@ -31,7 +31,8 @@ UI/
 Dev/
   MockHarness.lua     In-game simulated party/raid + control panel (debug builds only)
 pkgmeta.yaml          Packager ignore list
-.github/workflows/publish.yml   On merge to main: tag new version, then BigWigsMods/packager release
+.github/workflows/tag.yml       On merge to main: create vX.Y.Z tag if the version is new
+.github/workflows/publish.yml   On tag push: BigWigsMods/packager release
 ```
 
 ## Architecture
@@ -177,8 +178,12 @@ There is no headless test runner. The WoW API isn't available outside the client
 
 - Version appears in **two places**: `## Version:` in `Buffadin.toc` and `Buffadin.version` in `Core/Compat.lua`. Bump both together (commit style: `chore: bump version to X.Y.Z`).
 - **Always bump the version when opening a PR.** Increment patch (`0.1.X`) for fixes/chores, or minor (`0.X.0`) for new features and UI changes.
-- Releases are automatic. On every push to `main` (i.e. a merged PR), `publish.yml` reads the version from `Buffadin.toc`, fails if it doesn't match `Core/Compat.lua`, and, if tag `vX.Y.Z` doesn't exist yet, creates and pushes that annotated tag and runs `BigWigsMods/packager@v2` to upload to CurseForge (project `1710274`) and GitHub Releases. If the tag already exists, nothing is published. Merging a PR with a version bump therefore ships a release. It can also be run manually from the Actions tab (`workflow_dispatch`) with the same logic.
-- Don't create or push release tags by hand. Pushed tags no longer trigger the workflow.
+- Releases are automatic, in two workflows. Merging a PR with a version bump therefore ships a release.
+  1. `tag.yml` runs on every push to `main` (i.e. a merged PR). It reads the version from `Buffadin.toc`, fails if it doesn't match `Core/Compat.lua`, and, if tag `vX.Y.Z` doesn't exist yet, creates and pushes that annotated tag. If the tag exists, it does nothing.
+  2. `publish.yml` runs on the tag push and runs `BigWigsMods/packager@v2`, which uploads to CurseForge (project `1710274`) and GitHub Releases. It can also be run manually from the Actions tab on an existing tag to republish; runs on a branch are skipped.
+- `tag.yml` pushes the tag with the `RELEASE_TOKEN` secret (a fine-grained PAT with Contents: read and write on this repo), because tags pushed with `GITHUB_TOKEN` don't trigger other workflows. If releases stop appearing, check that the token hasn't expired.
+- Don't package on branch pushes: the packager skips a `push` run on a branch whose HEAD is tagged ("Found future tag"), and uploads an untagged commit as an alpha.
+- Tagging by hand still works, but the tag must be annotated (`git tag -a`) and match the version in both files.
 - Anything dev-only must be excluded from the package: add it to `pkgmeta.yaml` `ignore:` and `.gitattributes` `export-ignore`, or wrap `.toc` entries in `#@debug@`.
 
 ## Git workflow

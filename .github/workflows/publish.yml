@@ -1,22 +1,19 @@
-# Tags and publishes a release whenever main carries a version that has not
-# been tagged yet. The version comes from `## Version:` in Buffadin.toc, which
-# every PR bumps. Merges that don't change the version publish nothing.
+# Packages and publishes a release to CurseForge and GitHub Releases whenever
+# a tag is pushed. Tags are normally created by tag.yml when a version bump
+# merges to main; make sure any tag pushed by hand is annotated.
 #
-# The tag is created and packaged in the same job because tags pushed with
-# GITHUB_TOKEN do not trigger other workflows.
+# It can also be run manually on an existing tag to republish it. Runs on a
+# branch are skipped, since the packager would upload an alpha build.
 name: Package and release
 on:
   push:
-    branches:
-      - main
+    tags:
+      - '**'
   workflow_dispatch:
-
-concurrency:
-  group: release
-  cancel-in-progress: false
 
 jobs:
   release:
+    if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -29,43 +26,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Read and verify version
-        id: version
-        run: |
-          toc_version=$(sed -n 's/^## Version:[[:space:]]*\([^[:space:]]*\).*/\1/p' Buffadin.toc)
-          lua_version=$(sed -n 's/^Buffadin\.version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' Core/Compat.lua)
-          if [ -z "$toc_version" ]; then
-            echo "::error file=Buffadin.toc::Could not read '## Version:'"
-            exit 1
-          fi
-          if [ "$toc_version" != "$lua_version" ]; then
-            echo "::error::Version mismatch: Buffadin.toc has '$toc_version', Core/Compat.lua has '$lua_version'"
-            exit 1
-          fi
-          echo "tag=v$toc_version" >> "$GITHUB_OUTPUT"
-          echo "Version: $toc_version"
-
-      - name: Create tag if missing
-        id: tag
-        env:
-          TAG: ${{ steps.version.outputs.tag }}
-        run: |
-          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
-            echo "Tag $TAG already exists; nothing to release."
-            echo "created=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -a "$TAG" -m "Release $TAG"
-          git push origin "refs/tags/$TAG"
-          echo "created=true" >> "$GITHUB_OUTPUT"
-          echo "Created and pushed $TAG"
-
-      # Only package on a freshly tagged commit. On an untagged commit the
-      # packager would build and upload an alpha to CurseForge.
       - name: Package and release
-        if: steps.tag.outputs.created == 'true'
         uses: BigWigsMods/packager@v2
         with:
           args: -n "{project-version}"

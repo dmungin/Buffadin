@@ -1,0 +1,67 @@
+# Creates the release tag when main carries a version that has not been
+# tagged yet. The version comes from `## Version:` in Buffadin.toc, which
+# every PR bumps. Merges that don't change the version do nothing.
+#
+# The tag is pushed with RELEASE_TOKEN (a fine-grained PAT with Contents:
+# read and write on this repo) because tags pushed with GITHUB_TOKEN don't
+# trigger other workflows. The tag push then triggers publish.yml.
+name: Tag release
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: tag-release
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check for release token
+        env:
+          RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          if [ -z "$RELEASE_TOKEN" ]; then
+            echo "::error::RELEASE_TOKEN secret is not set; can't push a tag that triggers publish.yml"
+            exit 1
+          fi
+
+      - name: Clone project
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: Read and verify version
+        id: version
+        run: |
+          toc_version=$(sed -n 's/^## Version:[[:space:]]*\([^[:space:]]*\).*/\1/p' Buffadin.toc)
+          lua_version=$(sed -n 's/^Buffadin\.version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' Core/Compat.lua)
+          if [ -z "$toc_version" ]; then
+            echo "::error file=Buffadin.toc::Could not read '## Version:'"
+            exit 1
+          fi
+          if [ "$toc_version" != "$lua_version" ]; then
+            echo "::error::Version mismatch: Buffadin.toc has '$toc_version', Core/Compat.lua has '$lua_version'"
+            exit 1
+          fi
+          echo "tag=v$toc_version" >> "$GITHUB_OUTPUT"
+          echo "Version: $toc_version"
+
+      - name: Create and push tag if missing
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "Tag $TAG already exists; nothing to release."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Release $TAG"
+          git push origin "refs/tags/$TAG"
+          echo "Created and pushed $TAG; publish.yml will package it."
