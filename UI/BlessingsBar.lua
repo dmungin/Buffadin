@@ -174,9 +174,16 @@ function Bar:CreateUtilityButtons()
 		GameTooltip:AddLine(" ")
 		GameTooltip:AddLine("Priority Calculation Order:", 0.8, 0.8, 0.8)
 		GameTooltip:AddLine(" 1. Missing Paladin self-aura", 0.7, 0.7, 0.7)
-		GameTooltip:AddLine(" 2. Class with the most missing buffs", 0.7, 0.7, 0.7)
-		GameTooltip:AddLine(" 3. Expiring blessings (< 2 min remaining)", 0.7, 0.7, 0.7)
+		GameTooltip:AddLine(" 2. Revoke Salvation from excluded players (tanks)", 0.7, 0.7, 0.7)
+		GameTooltip:AddLine(" 3. Class with the most missing buffs", 0.7, 0.7, 0.7)
 		GameTooltip:AddLine(" 4. Individual normal overrides", 0.7, 0.7, 0.7)
+		GameTooltip:AddLine(" 5. Class with the most missing Salvation", 0.7, 0.7, 0.7)
+		GameTooltip:AddLine(
+			string.format(" 6. Expiring blessings / Salvation (< %d min remaining)", Buffadin.REFRESH_THRESHOLD / 60),
+			0.7,
+			0.7,
+			0.7
+		)
 		GameTooltip:AddLine(" ")
 		GameTooltip:AddLine("|cff00ff00Left-Click:|r Cast Greater Blessing (or Normal if unlearned)", 0.7, 0.7, 0.7)
 		GameTooltip:AddLine("|cff00ff00Right-Click:|r Cast Normal Blessing on next player", 0.7, 0.7, 0.7)
@@ -309,6 +316,22 @@ function Bar:CreateClassButtons()
 		btn.buffBadgeBg = buffBadgeBg
 		btn.classBadgeBg = buffBadgeBg -- backwards compatibility alias
 
+		-- Salvation badge (top-left), shown when Mass Salvation is assigned to this class
+		local salvIcon = btn:CreateTexture(nil, "OVERLAY", nil, 2)
+		salvIcon:SetSize(13, 13)
+		salvIcon:SetPoint("TOPLEFT", btn, "TOPLEFT", 2, -2)
+		salvIcon:SetTexture(Buffadin.MASS_SALVATION.icon)
+		salvIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+		salvIcon:Hide()
+		btn.salvIcon = salvIcon
+
+		local salvBadgeBg = btn:CreateTexture(nil, "OVERLAY", nil, 1)
+		salvBadgeBg:SetPoint("TOPLEFT", salvIcon, "TOPLEFT", -1, 1)
+		salvBadgeBg:SetPoint("BOTTOMRIGHT", salvIcon, "BOTTOMRIGHT", 1, -1)
+		salvBadgeBg:SetColorTexture(0.04, 0.04, 0.06, 0.92)
+		salvBadgeBg:Hide()
+		btn.salvBadgeBg = salvBadgeBg
+
 		-- Missing Count Badge (legacy alias, kept for compatibility)
 		local countText = btn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 		countText:SetPoint("TOPRIGHT", -2, -2)
@@ -355,6 +378,24 @@ function Bar:CreateClassButtons()
 						1
 					)
 				end
+				if statusInfo.salvAssigned then
+					local salvTotal = statusInfo.salvTotalCount or 0
+					local salvMissing = statusInfo.salvMissingCount or 0
+					GameTooltip:AddLine(
+						string.format("Salvation: %d / %d (Missing: %d)", salvTotal - salvMissing, salvTotal, salvMissing),
+						0.96,
+						0.55,
+						0.73
+					)
+				end
+				if (statusInfo.revokeCount or 0) > 0 then
+					GameTooltip:AddLine(
+						string.format("|cffffaa00Revoke needed:|r %d excluded player(s) have Salvation", statusInfo.revokeCount),
+						1,
+						0.8,
+						0.4
+					)
+				end
 			end
 
 			if Buffadin:InCombat() then
@@ -393,6 +434,7 @@ function Bar:CreateClassButtons()
 					0.7
 				)
 				GameTooltip:AddLine("|cff00ff00Right-Click:|r Cast Normal Blessing", 0.7, 0.7, 0.7)
+				GameTooltip:AddLine("|cff00ff00Middle-Click:|r Cast Mass Salvation", 0.7, 0.7, 0.7)
 				GameTooltip:AddLine("|cff00ff00Scroll / Shift-Click:|r Cycle Assigned Blessing", 0.7, 0.7, 0.7)
 				GameTooltip:AddLine("|cff00ff00Hover:|r View class members flyout", 0.7, 0.7, 0.7)
 			end
@@ -587,8 +629,30 @@ function Bar:RefreshDisplay()
 			-- Update Status Border
 			Buffadin.Theme:SetBorderStatus(btn, statusInfo.status or "Disabled")
 
+			-- Salvation badge: full color when everyone has it, dimmed while some are missing
+			if statusInfo.salvAssigned then
+				local salvMissing = (statusInfo.salvMissingCount or 0) > 0
+				btn.salvIcon:Show()
+				btn.salvBadgeBg:Show()
+				btn.salvIcon:SetDesaturated(salvMissing)
+				btn.salvIcon:SetAlpha(salvMissing and 0.6 or 1)
+			else
+				btn.salvIcon:Hide()
+				btn.salvBadgeBg:Hide()
+			end
+
+			-- Top-right: "R" when an excluded player needs Revoke, else missing Salvation count
+			if (statusInfo.revokeCount or 0) > 0 then
+				btn.countText:SetText("R")
+				btn.countText:SetTextColor(1, 0.6, 0.1)
+			elseif statusInfo.salvAssigned and (statusInfo.salvMissingCount or 0) > 0 and Buffadin.db.profile.showCounts then
+				btn.countText:SetText(tostring(statusInfo.salvMissingCount))
+				btn.countText:SetTextColor(0.96, 0.55, 0.73)
+			else
+				btn.countText:SetText("")
+			end
+
 			-- Update Status Text (bottom-left corner timer or missing count)
-			btn.countText:SetText("")
 
 			local hasMissing = (statusInfo.missingCount and statusInfo.missingCount > 0)
 			if hasMissing and Buffadin.db.profile.showCounts then
@@ -726,6 +790,36 @@ function Bar:RefreshDisplay()
 					btn:SetAttribute("unit2", nil)
 				end
 				btn:SetAttribute("shift-type2", "")
+
+				-- Configure Middle Click: Mass Salvation (Salvation if unlearned) on a player who isn't excluded
+				local salvSpellId = Buffadin:IsSpellKnown(Buffadin.MASS_SALVATION.spellId) and Buffadin.MASS_SALVATION.spellId
+					or Buffadin.SALVATION.spellId
+				local salvSpellName = Buffadin:IsSpellKnown(salvSpellId) and Buffadin:GetSpellName(salvSpellId) or ""
+				local salvTarget = nil
+				local salvFallback = nil
+				for _, u in ipairs(classUnits) do
+					local uStatus = Buffadin.BuffScanner.unitStatus[u.unitId]
+					local excluded = Buffadin.Assignments:IsSalvationExcluded(u.name, u.isTank)
+					if not excluded and not u.isDead and u.isOnline and u.isVisible then
+						salvFallback = salvFallback or u.unitId
+						if not (uStatus and uStatus.hasSalv) and Buffadin:IsUnitInRange(u.unitId, salvSpellId) then
+							salvTarget = u.unitId
+							break
+						end
+					end
+				end
+				salvTarget = salvTarget or salvFallback
+
+				if salvSpellName ~= "" and salvTarget then
+					btn:SetAttribute("type3", isMock and nil or "spell")
+					btn:SetAttribute("spell3", salvSpellName)
+					btn:SetAttribute("unit3", salvTarget)
+				else
+					btn:SetAttribute("type3", nil)
+					btn:SetAttribute("spell3", nil)
+					btn:SetAttribute("unit3", nil)
+				end
+				btn:SetAttribute("shift-type3", "")
 			end
 		end
 	end

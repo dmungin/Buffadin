@@ -1,7 +1,7 @@
 local addonName, Buffadin = ...
 _G["Buffadin"] = Buffadin
 
-Buffadin.version = "0.2.3"
+Buffadin.version = "0.3.0"
 Buffadin.addonName = addonName
 Buffadin.combatQueue = {}
 
@@ -63,6 +63,9 @@ function Buffadin:GetSpellName(spellID)
     if self.RIGHTEOUS_FURY and self.RIGHTEOUS_FURY.spellId == spellID then
         return self.RIGHTEOUS_FURY.name
     end
+    for _, spell in ipairs({ self.SALVATION, self.MASS_SALVATION, self.REVOKE }) do
+        if spell.spellId == spellID then return spell.name end
+    end
     for _, s in pairs(self.SEALS or {}) do
         if s.spellId == spellID then return s.name end
     end
@@ -116,6 +119,14 @@ end
 -- Range Checking (Prioritizes nearby targets; defaults to true so it never blocks)
 -- =========================================================================
 
+-- Range APIs may return secret values (UnitInRange is SecretReturns on Forever);
+-- comparing a secret from tainted code throws, so treat secrets as "unknown".
+local function UsableRangeResult(ok, inRange)
+    if not ok then return false end
+    if issecretvalue and issecretvalue(inRange) then return false end
+    return inRange ~= nil
+end
+
 function Buffadin:IsUnitInRange(unit, spellID, spellName)
     -- Mock Harness override: mock units are always considered in range
     if Buffadin.MockHarness and Buffadin.MockHarness.active then
@@ -132,7 +143,7 @@ function Buffadin:IsUnitInRange(unit, spellID, spellName)
     -- Modern Dragonflight / The War Within C_Spell API
     if spellID and C_Spell and C_Spell.IsSpellInRange then
         local ok, inRange = pcall(C_Spell.IsSpellInRange, spellID, unit)
-        if ok and inRange ~= nil then
+        if UsableRangeResult(ok, inRange) then
             return (inRange == true or inRange == 1)
         end
     end
@@ -140,7 +151,7 @@ function Buffadin:IsUnitInRange(unit, spellID, spellName)
     -- Legacy IsSpellInRange
     if spellName and _G.IsSpellInRange then
         local ok, inRange = pcall(_G.IsSpellInRange, spellName, unit)
-        if ok and inRange ~= nil then
+        if UsableRangeResult(ok, inRange) then
             return (inRange == true or inRange == 1)
         end
     end
@@ -148,7 +159,7 @@ function Buffadin:IsUnitInRange(unit, spellID, spellName)
     -- Standard 40y range check fallback
     if UnitInRange then
         local ok, inRange = pcall(UnitInRange, unit)
-        if ok and inRange ~= nil then
+        if UsableRangeResult(ok, inRange) then
             return (inRange == true or inRange == 1)
         end
     end

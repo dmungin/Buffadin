@@ -185,6 +185,19 @@ function Buffadin:InitDB()
     else
         charProfile.auraAssignments = Buffadin.Assignments.auraData
     end
+    if charProfile.salvAssignments then
+        Buffadin.Assignments.salvData = charProfile.salvAssignments
+    else
+        charProfile.salvAssignments = Buffadin.Assignments.salvData
+    end
+    if charProfile.salvExclusions then
+        Buffadin.Assignments.salvExclude = charProfile.salvExclusions
+    else
+        charProfile.salvExclusions = Buffadin.Assignments.salvExclude
+    end
+
+    -- Salvation stopped being a Blessing in the 10/15 beta build: convert old index-4 assignments
+    Buffadin.Assignments:MigrateLegacySalvation()
 end
 
 Buffadin.EventFrame:SetScript("OnEvent", function(self, event, ...)

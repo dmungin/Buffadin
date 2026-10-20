@@ -22,7 +22,38 @@ for _, cls in ipairs(Buffadin.CLASSES) do
         minExpiration = 0,
         assignedGSpell = 0,
         assignedNSpell = 0,
+        salvAssigned = false,
+        salvMissingCount = 0,
+        salvTotalCount = 0,
+        salvMinExpiration = 0,
+        revokeCount = 0,
     }
+end
+
+-- Find Salvation or Mass Salvation on a unit. Returns: hasSalv, absoluteExpiration
+local function FindSalvation(unit, currentTime)
+    for _, spell in ipairs({ Buffadin.MASS_SALVATION, Buffadin.SALVATION }) do
+        local found, expTime, duration = Buffadin:FindUnitBuff(unit, spell.spellId, Buffadin:GetSpellName(spell.spellId))
+        if found then
+            if expTime and expTime > 0 then
+                return true, expTime
+            end
+            return true, currentTime + ((duration and duration > 0) and duration or Buffadin.DURATION_SALVATION)
+        end
+    end
+    return false, 0
+end
+
+-- Shared class status rules for blessings and Salvation
+local function GetGroupStatus(missingCount, totalAlive)
+    if totalAlive == 0 then
+        return "Disabled"
+    elseif missingCount == 0 then
+        return "Good"
+    elseif missingCount == totalAlive then
+        return "All"
+    end
+    return "Some"
 end
 
 function Buffadin.BuffScanner:Scan()
@@ -54,10 +85,17 @@ function Buffadin.BuffScanner:Scan()
         local minExpiration = 99999
         local hasSpecialMissing = false
 
+        local salvAssigned = Buffadin.Assignments:GetSalvation(playerName, classId)
+        local salvMissingCount = 0
+        local salvTotalCount = 0
+        local salvMinExpiration = 99999
+        local revokeCount = 0
+
         for _, unitInfo in ipairs(units) do
             local unit = unitInfo.unitId
             local isDead = Buffadin:IsUnitDead(unit)
             local isOnline = Buffadin:IsUnitConnected(unit)
+            local salvExcluded = Buffadin.Assignments:IsSalvationExcluded(unitInfo.name, unitInfo.isTank)
 
             -- Check if this specific unit has a Normal Blessing override assigned
             local nIndex = Buffadin.Assignments:GetNormal(playerName, classId, unitInfo.name)
@@ -103,8 +141,27 @@ function Buffadin.BuffScanner:Scan()
                     end
                 elseif hasBuff then
                     -- Buff exists without expiration or long duration
-                    remaining = duration or 900
+                    remaining = duration or Buffadin.DURATION_GREATER
                     absExp = currentTime + remaining
+                end
+
+                -- Salvation: excluded players (tanks) need it Revoked, everyone else in an assigned class needs it
+                local hasSalv, salvAbsExp = false, 0
+                if salvAssigned or salvExcluded then
+                    hasSalv, salvAbsExp = FindSalvation(unit, currentTime)
+                end
+                local salvRemaining = hasSalv and math.max(0, salvAbsExp - currentTime) or 0
+                if salvExcluded then
+                    if hasSalv then
+                        revokeCount = revokeCount + 1
+                    end
+                elseif salvAssigned then
+                    salvTotalCount = salvTotalCount + 1
+                    if not hasSalv then
+                        salvMissingCount = salvMissingCount + 1
+                    elseif salvRemaining < salvMinExpiration then
+                        salvMinExpiration = salvRemaining
+                    end
                 end
 
                 if not hasBuff then
@@ -126,6 +183,10 @@ function Buffadin.BuffScanner:Scan()
                     assignedSpellName = (targetGSpellName ~= "") and targetGSpellName or targetNSpellName,
                     isSpecial = isSpecial,
                     diedInCombat = false,
+                    hasSalv = hasSalv,
+                    salvExpiration = salvRemaining,
+                    salvAbsExpiration = salvAbsExp,
+                    salvExcluded = salvExcluded,
                 }
             elseif Buffadin:UnitExists(unit) then
                 -- Dead or offline unit: populate assignments but marked as unbuffed
@@ -138,6 +199,10 @@ function Buffadin.BuffScanner:Scan()
                     assignedSpellName = (targetGSpellName ~= "") and targetGSpellName or targetNSpellName,
                     isSpecial = isSpecial,
                     diedInCombat = isDead,
+                    hasSalv = false,
+                    salvExpiration = 0,
+                    salvAbsExpiration = 0,
+                    salvExcluded = salvExcluded,
                 }
             end
         end
@@ -160,6 +225,11 @@ function Buffadin.BuffScanner:Scan()
             status = "Some"
         end
 
+        -- With no blessing assigned, the class border reflects Salvation instead
+        if status == "Disabled" and salvAssigned then
+            status = GetGroupStatus(salvMissingCount, salvTotalCount)
+        end
+
         self.classStatus[classId] = {
             status = status,
             missingCount = missingCount,
@@ -169,6 +239,11 @@ function Buffadin.BuffScanner:Scan()
             minExpiration = (minExpiration < 99999) and minExpiration or 0,
             assignedGSpell = gIndex,
             assignedNSpell = nEquivIndex,
+            salvAssigned = salvAssigned,
+            salvMissingCount = salvMissingCount,
+            salvTotalCount = salvTotalCount,
+            salvMinExpiration = (salvMinExpiration < 99999) and salvMinExpiration or 0,
+            revokeCount = revokeCount,
         }
     end
 
@@ -230,6 +305,12 @@ function Buffadin.BuffScanner:UpdateInCombat(playerName, currentTime)
         local minExpiration = 99999
         local hasSpecialMissing = false
 
+        local salvAssigned = Buffadin.Assignments:GetSalvation(playerName, classId)
+        local salvMissingCount = 0
+        local salvTotalCount = 0
+        local salvMinExpiration = 99999
+        local revokeCount = 0
+
         for _, unitInfo in ipairs(units) do
             local unit = unitInfo.unitId
             local isDead = Buffadin:IsUnitDead(unit)
@@ -289,6 +370,34 @@ function Buffadin.BuffScanner:UpdateInCombat(playerName, currentTime)
                     classMissingCount = classMissingCount + 1
                 end
             end
+
+            -- Salvation countdown (death strips it like any other buff)
+            if uStatus and uStatus.hasSalv then
+                if isDead or uStatus.diedInCombat then
+                    uStatus.hasSalv = false
+                    uStatus.salvExpiration = 0
+                elseif uStatus.salvAbsExpiration and uStatus.salvAbsExpiration > 0 then
+                    uStatus.salvExpiration = math.max(0, uStatus.salvAbsExpiration - currentTime)
+                    if uStatus.salvExpiration <= 0 then
+                        uStatus.hasSalv = false
+                    end
+                end
+            end
+            if not isDead and isOnline and Buffadin:UnitExists(unit) then
+                local hasSalv = uStatus and uStatus.hasSalv
+                if Buffadin.Assignments:IsSalvationExcluded(unitInfo.name, unitInfo.isTank) then
+                    if hasSalv then
+                        revokeCount = revokeCount + 1
+                    end
+                elseif salvAssigned then
+                    salvTotalCount = salvTotalCount + 1
+                    if not hasSalv then
+                        salvMissingCount = salvMissingCount + 1
+                    elseif uStatus.salvExpiration < salvMinExpiration then
+                        salvMinExpiration = uStatus.salvExpiration
+                    end
+                end
+            end
         end
 
         local status = "Disabled"
@@ -308,6 +417,11 @@ function Buffadin.BuffScanner:UpdateInCombat(playerName, currentTime)
             status = "Some"
         end
 
+        -- With no blessing assigned, the class border reflects Salvation instead
+        if status == "Disabled" and salvAssigned then
+            status = GetGroupStatus(salvMissingCount, salvTotalCount)
+        end
+
         self.classStatus[classId] = {
             status = status,
             missingCount = missingCount,
@@ -317,6 +431,11 @@ function Buffadin.BuffScanner:UpdateInCombat(playerName, currentTime)
             minExpiration = (minExpiration < 99999) and minExpiration or 0,
             assignedGSpell = gIndex,
             assignedNSpell = nEquivIndex,
+            salvAssigned = salvAssigned,
+            salvMissingCount = salvMissingCount,
+            salvTotalCount = salvTotalCount,
+            salvMinExpiration = (salvMinExpiration < 99999) and salvMinExpiration or 0,
+            revokeCount = revokeCount,
         }
     end
 
@@ -346,7 +465,7 @@ end
 -- =========================================================================
 
 function Buffadin.BuffScanner:RecordBuffApplied(unitOrClassOrName, spellId, spellName, isGreater, duration)
-    duration = duration or (isGreater and (Buffadin.DURATION_GREATER or 900) or (Buffadin.DURATION_NORMAL or 300))
+    duration = duration or (isGreater and Buffadin.DURATION_GREATER or Buffadin.DURATION_NORMAL)
     local currentTime = GetTime()
 
     local function ApplyToUnit(uInfo)
@@ -417,6 +536,20 @@ function Buffadin.BuffScanner:RecordBuffRemoved(unitOrName, spellId, spellName)
     end
 end
 
+-- Pick a visible, alive unit matching `predicate`, preferring one in range of `spellId`
+local function PickUnit(units, spellId, predicate)
+    local fallback = nil
+    for _, u in ipairs(units or {}) do
+        if not u.isDead and u.isOnline and u.isVisible and predicate(u) then
+            if Buffadin:IsUnitInRange(u.unitId, spellId) then
+                return u
+            end
+            fallback = fallback or u
+        end
+    end
+    return fallback
+end
+
 -- Find next best target/spell to buff (used by Auto-Buff button)
 -- Returns: targetUnit, gSpellId, nSpellId, isGreater, classId, reasonText
 function Buffadin.BuffScanner:GetNextAutoBuff()
@@ -432,7 +565,23 @@ function Buffadin.BuffScanner:GetNextAutoBuff()
         end
     end
 
-    -- 2. Check classes needing Greater / Normal Blessings (Prioritize class with highest missing count)
+    -- 2. Revoke Salvation from excluded players (tanks) that Mass Salvation landed on
+    local revokeId = Buffadin.REVOKE.spellId
+    if Buffadin:IsSpellKnown(revokeId) then
+        for classId, statusInfo in pairs(self.classStatus) do
+            if (statusInfo.revokeCount or 0) > 0 then
+                local u = PickUnit(Buffadin.Roster.classes[classId], revokeId, function(unit)
+                    local uStatus = self.unitStatus[unit.unitId]
+                    return uStatus and uStatus.salvExcluded and uStatus.hasSalv
+                end)
+                if u then
+                    return u.unitId, revokeId, revokeId, false, classId, string.format("%s (Revoke Salvation)", u.name)
+                end
+            end
+        end
+    end
+
+    -- 3. Check classes needing Greater / Normal Blessings (Prioritize class with highest missing count)
     local bestClassId = nil
     local maxMissing = 0
     local targetUnit = nil
@@ -482,7 +631,7 @@ function Buffadin.BuffScanner:GetNextAutoBuff()
         return targetUnit, gSpellId, nSpellId, true, bestClassId, reason
     end
 
-    -- 3. Check individual Normal Blessing overrides (e.g. Tank needing Sanctuary/Might)
+    -- 4. Check individual Normal Blessing overrides (e.g. Tank needing Sanctuary/Might)
     for classId, units in pairs(Buffadin.Roster.classes) do
         for _, u in ipairs(units) do
             local nIndex = Buffadin.Assignments:GetNormal(playerName, classId, u.name)
@@ -499,9 +648,36 @@ function Buffadin.BuffScanner:GetNextAutoBuff()
         end
     end
 
-    -- 4. Check expiring blessings (< 2 minutes remaining)
+    -- 5. Check classes missing Salvation (Mass Salvation, or single Salvation if unlearned)
+    local massSalvId = Buffadin.MASS_SALVATION.spellId
+    local salvId = Buffadin.SALVATION.spellId
+    local bestSalvClassId = nil
+    local maxSalvMissing = 0
+    local salvTarget = nil
+    for classId, statusInfo in pairs(self.classStatus) do
+        local salvMissing = statusInfo.salvMissingCount or 0
+        if statusInfo.salvAssigned and salvMissing > maxSalvMissing then
+            local u = PickUnit(Buffadin.Roster.classes[classId], massSalvId, function(unit)
+                local uStatus = self.unitStatus[unit.unitId]
+                return uStatus and not uStatus.hasSalv and not uStatus.salvExcluded
+            end)
+            if u then
+                maxSalvMissing = salvMissing
+                bestSalvClassId = classId
+                salvTarget = u.unitId
+            end
+        end
+    end
+
+    if bestSalvClassId and salvTarget then
+        local cls = Buffadin.CLASS_BY_ID[bestSalvClassId]
+        local reason = string.format("%s (%d missing Salvation)", cls and cls.name or "Class", maxSalvMissing)
+        return salvTarget, massSalvId, salvId, true, bestSalvClassId, reason
+    end
+
+    -- 6. Check expiring blessings (< REFRESH_THRESHOLD remaining)
     local expiringClassId = nil
-    local lowestTime = 120 -- 2 minutes threshold
+    local lowestTime = Buffadin.REFRESH_THRESHOLD
     local expiringTarget = nil
 
     for classId, statusInfo in pairs(self.classStatus) do
@@ -539,9 +715,34 @@ function Buffadin.BuffScanner:GetNextAutoBuff()
 
         local cls = Buffadin.CLASS_BY_ID[expiringClassId]
         local clsName = cls and cls.name or "Class"
-        local reason = string.format("%s (expiring in %ds)", clsName, math.floor(lowestTime))
+        local reason = string.format("%s (expiring in %s)", clsName, Buffadin.Theme:FormatTime(lowestTime))
 
         return expiringTarget, gSpellId, nSpellId, true, expiringClassId, reason
+    end
+
+    -- 7. Check expiring Salvation
+    local expiringSalvClassId = nil
+    local lowestSalvTime = Buffadin.REFRESH_THRESHOLD
+    local expiringSalvTarget = nil
+    for classId, statusInfo in pairs(self.classStatus) do
+        local salvExp = statusInfo.salvMinExpiration or 0
+        if statusInfo.salvAssigned and salvExp > 0 and salvExp < lowestSalvTime then
+            local u = PickUnit(Buffadin.Roster.classes[classId], massSalvId, function(unit)
+                local uStatus = self.unitStatus[unit.unitId]
+                return uStatus and not uStatus.salvExcluded
+            end)
+            if u then
+                lowestSalvTime = salvExp
+                expiringSalvClassId = classId
+                expiringSalvTarget = u.unitId
+            end
+        end
+    end
+
+    if expiringSalvClassId and expiringSalvTarget then
+        local cls = Buffadin.CLASS_BY_ID[expiringSalvClassId]
+        local reason = string.format("%s (Salvation expiring in %s)", cls and cls.name or "Class", Buffadin.Theme:FormatTime(lowestSalvTime))
+        return expiringSalvTarget, massSalvId, salvId, true, expiringSalvClassId, reason
     end
 
     return nil, nil, nil, nil, nil, nil

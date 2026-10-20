@@ -34,7 +34,7 @@ Buffadin.GREATER_BLESSINGS = {
     [1] = { id = 1, name = "Greater Blessing of Wisdom", icon = "Interface\\Icons\\Spell_Holy_GreaterBlessingofWisdom", spellId = 25894 },
     [2] = { id = 2, name = "Greater Blessing of Might", icon = "Interface\\Icons\\Spell_Holy_GreaterBlessingofKings", spellId = 25782 },
     [3] = { id = 3, name = "Greater Blessing of Kings", icon = "Interface\\Icons\\Spell_Magic_GreaterBlessingofKings", spellId = 25898 },
-    [4] = { id = 4, name = "Greater Blessing of Salvation", icon = "Interface\\Icons\\Spell_Holy_GreaterBlessingofSalvation", spellId = 25895 },
+    -- [4] retired: Greater Blessing of Salvation is now Mass Salvation (see SALVATION below)
     [5] = { id = 5, name = "Greater Blessing of Light", icon = "Interface\\Icons\\Spell_Holy_GreaterBlessingofLight", spellId = 25890 },
     [6] = { id = 6, name = "Greater Blessing of Sanctuary", icon = "Interface\\Icons\\Spell_Holy_GreaterBlessingofSanctuary", spellId = 25899 },
 }
@@ -48,7 +48,7 @@ Buffadin.NORMAL_BLESSINGS = {
     [1] = { id = 1, name = "Blessing of Wisdom", icon = "Interface\\Icons\\Spell_Holy_SealOfWisdom", spellId = 19742 },
     [2] = { id = 2, name = "Blessing of Might", icon = "Interface\\Icons\\Spell_Holy_FistOfJustice", spellId = 19740 },
     [3] = { id = 3, name = "Blessing of Kings", icon = "Interface\\Icons\\Spell_Magic_MageArmor", spellId = 20217 },
-    [4] = { id = 4, name = "Blessing of Salvation", icon = "Interface\\Icons\\Spell_Holy_SealOfSalvation", spellId = 1038 },
+    -- [4] retired: Blessing of Salvation is now Salvation (see SALVATION below)
     [5] = { id = 5, name = "Blessing of Light", icon = "Interface\\Icons\\Spell_Holy_PrayerOfHealing02", spellId = 19977 },
     [6] = { id = 6, name = "Blessing of Sanctuary", icon = "Interface\\Icons\\Spell_Nature_LightningShield", spellId = 20911 },
 }
@@ -60,9 +60,34 @@ Buffadin.GREATER_TO_NORMAL = {
     [1] = 1, -- Wisdom
     [2] = 2, -- Might
     [3] = 3, -- Kings
-    [4] = 4, -- Salvation
     [5] = 5, -- Light
     [6] = 6, -- Sanctuary
+}
+
+-- =========================================================================
+-- Salvation (no longer a Blessing on Forever: stacks with blessings)
+-- =========================================================================
+-- Blessing index 4 used to be Salvation. It stays unused so the indices of
+-- Light (5) and Sanctuary (6) remain compatible with older clients' sync data.
+Buffadin.SALVATION_LEGACY_INDEX = 4
+
+Buffadin.SALVATION = {
+    spellId = 1038,
+    name = "Salvation",
+    icon = "Interface\\Icons\\Spell_Holy_SealOfSalvation",
+}
+
+Buffadin.MASS_SALVATION = {
+    spellId = 25895,
+    name = "Mass Salvation",
+    icon = "Interface\\Icons\\Spell_Holy_GreaterBlessingofSalvation",
+}
+
+-- Removes Salvation or Mass Salvation from a party/raid member (e.g. a tank hit by Mass Salvation)
+Buffadin.REVOKE = {
+    spellId = 1325499,
+    name = "Revoke",
+    icon = "Interface\\Icons\\Spell_Holy_DispelMagic",
 }
 
 -- =========================================================================
@@ -100,9 +125,13 @@ Buffadin.RIGHTEOUS_FURY = {
     icon = "Interface\\Icons\\Spell_Holy_SealOfFury"
 }
 
--- Buff durations in seconds
-Buffadin.DURATION_GREATER = 15 * 60  -- 15 minutes
-Buffadin.DURATION_NORMAL  = 5 * 60   -- 5 minutes
+-- Buff durations in seconds (all blessings and Salvation last 1 hour on Forever)
+Buffadin.DURATION_GREATER   = 60 * 60
+Buffadin.DURATION_NORMAL    = 60 * 60
+Buffadin.DURATION_SALVATION = 60 * 60
+
+-- Auto-Buff refreshes blessings with less than this much time remaining
+Buffadin.REFRESH_THRESHOLD = 5 * 60
 
 -- =========================================================================
 -- Default User Configuration
@@ -136,5 +165,7 @@ Buffadin.DEFAULT_CONFIG = {
     assignments = {},       -- [pallyName][classId] = greaterBlessingIndex
     normalAssignments = {}, -- [pallyName][classId][unitName] = normalBlessingIndex
     auraAssignments = {},   -- [pallyName] = auraIndex
+    salvAssignments = {},   -- [pallyName][classId] = true (Mass Salvation on that class)
+    salvExclusions = {},    -- [unitName] = true/false (nil = default: tanks are excluded)
     presets = {},
 }
