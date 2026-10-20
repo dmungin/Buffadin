@@ -4,7 +4,26 @@ Buffadin.Assignments = {
     data = {},         -- [pallyName][classId] = greaterIndex (0-6)
     normalData = {},   -- [pallyName][classId][unitName] = normalIndex (0-9)
     auraData = {},     -- [pallyName] = auraIndex (0-8)
+    salvData = {},     -- [pallyName][classId] = true (Mass Salvation on that class)
+    salvExclude = {},  -- [unitName] = true/false (nil = default: tanks are excluded)
 }
+
+-- Step through a 0-indexed spell table, skipping retired (nil) indices
+local function StepIndex(tbl, maxIndex, current, step)
+    local nextVal = current
+    for _ = 0, maxIndex do
+        nextVal = nextVal + step
+        if nextVal > maxIndex then
+            nextVal = 0
+        elseif nextVal < 0 then
+            nextVal = maxIndex
+        end
+        if tbl[nextVal] then
+            return nextVal
+        end
+    end
+    return 0
+end
 
 -- Normalize paladin name so the local player always resolves to UnitName("player")
 function Buffadin.Assignments:NormalizePaladinName(pallyName)
@@ -41,6 +60,38 @@ function Buffadin.Assignments:EnsurePaladin(pallyName)
     if self.auraData[pallyName] == nil then
         self.auraData[pallyName] = 0
     end
+    if not self.salvData[pallyName] then
+        self.salvData[pallyName] = {}
+    end
+end
+
+-- One-time conversion of saved assignments from before Salvation stopped being a Blessing
+function Buffadin.Assignments:MigrateLegacySalvation()
+    local legacy = Buffadin.SALVATION_LEGACY_INDEX
+    local changed = false
+    for pallyName, classes in pairs(self.data) do
+        for classId, gIndex in pairs(classes) do
+            if gIndex == legacy then
+                classes[classId] = 0
+                self.salvData[pallyName] = self.salvData[pallyName] or {}
+                self.salvData[pallyName][classId] = true
+                changed = true
+            end
+        end
+    end
+    for _, classes in pairs(self.normalData) do
+        for _, units in pairs(classes) do
+            for unitName, nIndex in pairs(units) do
+                if nIndex == legacy then
+                    units[unitName] = 0
+                    changed = true
+                end
+            end
+        end
+    end
+    if changed then
+        Buffadin:Debug("Converted legacy Salvation blessing assignments to Mass Salvation.")
+    end
 end
 
 -- =========================================================================
@@ -65,6 +116,13 @@ function Buffadin.Assignments:SetGreater(pallyName, classId, blessingIndex, skip
     end
 
     blessingIndex = math.max(0, math.min(Buffadin.MAX_GREATER_BLESSINGS, blessingIndex or 0))
+    if blessingIndex == Buffadin.SALVATION_LEGACY_INDEX then
+        -- Older clients still send Salvation as a Greater Blessing: treat it as Mass Salvation
+        self:SetSalvation(pallyName, classId, true, true)
+        blessingIndex = 0
+    elseif not Buffadin.GREATER_BLESSINGS[blessingIndex] then
+        blessingIndex = 0
+    end
     self.data[pallyName][classId] = blessingIndex
 
     -- Persist to DB
@@ -89,13 +147,7 @@ function Buffadin.Assignments:CycleGreater(pallyName, classId, step)
 
     step = step or 1
     local current = self:GetGreater(pallyName, classId)
-    local nextVal = current + step
-
-    if nextVal > Buffadin.MAX_GREATER_BLESSINGS then
-        nextVal = 0
-    elseif nextVal < 0 then
-        nextVal = Buffadin.MAX_GREATER_BLESSINGS
-    end
+    local nextVal = StepIndex(Buffadin.GREATER_BLESSINGS, Buffadin.MAX_GREATER_BLESSINGS, current, step)
 
     self:SetGreater(pallyName, classId, nextVal)
 end
@@ -121,6 +173,9 @@ function Buffadin.Assignments:SetNormal(pallyName, classId, unitName, blessingIn
     end
 
     blessingIndex = math.max(0, math.min(Buffadin.MAX_NORMAL_BLESSINGS, blessingIndex or 0))
+    if not Buffadin.NORMAL_BLESSINGS[blessingIndex] then
+        blessingIndex = 0
+    end
     self.normalData[pallyName][classId][unitName] = blessingIndex
 
     if Buffadin.db and Buffadin.db.profile then
@@ -145,13 +200,7 @@ function Buffadin.Assignments:CycleNormal(pallyName, classId, unitName, step)
 
     step = step or 1
     local current = self:GetNormal(pallyName, classId, unitName)
-    local nextVal = current + step
-
-    if nextVal > Buffadin.MAX_NORMAL_BLESSINGS then
-        nextVal = 0
-    elseif nextVal < 0 then
-        nextVal = Buffadin.MAX_NORMAL_BLESSINGS
-    end
+    local nextVal = StepIndex(Buffadin.NORMAL_BLESSINGS, Buffadin.MAX_NORMAL_BLESSINGS, current, step)
 
     self:SetNormal(pallyName, classId, unitName, nextVal)
 end
@@ -209,6 +258,91 @@ function Buffadin.Assignments:CycleAura(pallyName, step)
     self:SetAura(pallyName, nextVal)
 end
 
+-- =========================================================================
+-- Salvation (separate layer: stacks with blessings, cast as Mass Salvation)
+-- =========================================================================
+
+function Buffadin.Assignments:GetSalvation(pallyName, classId)
+    pallyName = self:NormalizePaladinName(pallyName)
+    if not pallyName or pallyName == "" or not classId then return false end
+    self:EnsurePaladin(pallyName)
+    return self.salvData[pallyName][classId] == true
+end
+
+function Buffadin.Assignments:SetSalvation(pallyName, classId, enabled, skipSync)
+    pallyName = self:NormalizePaladinName(pallyName)
+    if not pallyName or pallyName == "" or not classId then return end
+    self:EnsurePaladin(pallyName)
+
+    if not skipSync and not Buffadin.Roster:CanEditAssignments() then
+        Buffadin:Print("Only the Raid Leader or Raid Assistant can modify assignments.")
+        return
+    end
+
+    self.salvData[pallyName][classId] = enabled and true or nil
+
+    if Buffadin.db and Buffadin.db.profile then
+        Buffadin.db.profile.salvAssignments = self.salvData
+    end
+
+    if not skipSync then
+        self:BroadcastSalvation(pallyName, classId, enabled)
+    end
+
+    if Buffadin.OnAssignmentsChanged then
+        Buffadin:OnAssignmentsChanged()
+    end
+end
+
+function Buffadin.Assignments:ToggleSalvation(pallyName, classId)
+    if not Buffadin.Roster:CanEditAssignments() then
+        Buffadin:Print("Only the Raid Leader or Raid Assistant can modify assignments.")
+        return
+    end
+    self:SetSalvation(pallyName, classId, not self:GetSalvation(pallyName, classId))
+end
+
+-- Players excluded from Salvation (tanks by default) should have it Revoked if they get hit by Mass Salvation
+function Buffadin.Assignments:IsSalvationExcluded(unitName, isTank)
+    if not unitName or unitName == "" then return false end
+    local explicit = self.salvExclude[unitName]
+    if explicit ~= nil then
+        return explicit
+    end
+    return isTank == true
+end
+
+function Buffadin.Assignments:SetSalvationExcluded(unitName, excluded, skipSync)
+    if not unitName or unitName == "" then return end
+
+    if not skipSync and not Buffadin.Roster:CanEditAssignments() then
+        Buffadin:Print("Only the Raid Leader or Raid Assistant can modify assignments.")
+        return
+    end
+
+    self.salvExclude[unitName] = excluded and true or false
+
+    if Buffadin.db and Buffadin.db.profile then
+        Buffadin.db.profile.salvExclusions = self.salvExclude
+    end
+
+    if not skipSync then
+        self:BroadcastSalvationExcluded(unitName, excluded)
+    end
+
+    if Buffadin.OnAssignmentsChanged then
+        Buffadin:OnAssignmentsChanged()
+    end
+end
+
+function Buffadin.Assignments:ToggleSalvationExcluded(unitName, isTank)
+    if not Buffadin.Roster:CanEditAssignments() then
+        Buffadin:Print("Only the Raid Leader or Raid Assistant can modify assignments.")
+        return
+    end
+    self:SetSalvationExcluded(unitName, not self:IsSalvationExcluded(unitName, isTank))
+end
+
 function Buffadin.Assignments:ClearAll()
     if not Buffadin.Roster:CanEditAssignments() then
         Buffadin:Print("Only the Raid Leader or Raid Assistant can clear assignments.")
@@ -228,11 +362,15 @@ function Buffadin.Assignments:ClearAll()
     for pallyName in pairs(self.auraData) do
         self.auraData[pallyName] = 0
     end
+    for pallyName in pairs(self.salvData) do
+        self.salvData[pallyName] = {}
+    end
 
     if Buffadin.db and Buffadin.db.profile then
         Buffadin.db.profile.assignments = self.data
         Buffadin.db.profile.normalAssignments = self.normalData
         Buffadin.db.profile.auraAssignments = self.auraData
+        Buffadin.db.profile.salvAssignments = self.salvData
     end
 
     self:BroadcastFullSync()
@@ -260,8 +398,9 @@ function Buffadin.Assignments:AutoAssign()
     end
 
     -- Priority order for blessings per role:
-    -- Physical DPS (Warrior, Rogue, Hunter, Pet): Might (2) -> Kings (3) -> Salvation (4) -> Light (5)
-    -- Casters/Healers (Priest, Mage, Warlock, Druid, Shaman, Paladin): Wisdom (1) -> Kings (3) -> Salvation (4) -> Light (5)
+    -- Physical DPS (Warrior, Rogue, Hunter, Pet): Might (2) -> Kings (3) -> Light (5)
+    -- Casters/Healers (Priest, Mage, Warlock, Druid, Shaman, Paladin): Wisdom (1) -> Kings (3) -> Light (5)
+    -- Salvation is not a Blessing, so it is layered on top of these (see below).
     local physicalClasses = { [1] = true, [3] = true, [4] = true, [10] = true }
     local manaClasses     = { [2] = true, [5] = true, [6] = true, [7] = true, [8] = true, [9] = true }
 
@@ -305,11 +444,10 @@ function Buffadin.Assignments:AutoAssign()
             self:SetGreater(p1, cls.id, 3, true) -- Kings for everyone
             if physicalClasses[cls.id] then
                 self:SetGreater(p2, cls.id, 2, true) -- Might
-                self:SetGreater(p3, cls.id, 4, true) -- Salvation
             else
                 self:SetGreater(p2, cls.id, 1, true) -- Wisdom
-                self:SetGreater(p3, cls.id, 4, true) -- Salvation
             end
+            self:SetGreater(p3, cls.id, 5, true) -- Light
         end
     else
         -- 4 or more Paladins
@@ -318,15 +456,24 @@ function Buffadin.Assignments:AutoAssign()
             self:SetGreater(p1, cls.id, 3, true) -- Kings
             self:SetGreater(p2, cls.id, 2, true) -- Might
             self:SetGreater(p3, cls.id, 1, true) -- Wisdom
-            self:SetGreater(p4, cls.id, 4, true) -- Salvation
+            self:SetGreater(p4, cls.id, 5, true) -- Light
         end
-        -- Extra Paladins (5+) get Light (5) or Sanctuary (6)
+        -- Paladin 5 gets Sanctuary (6); any further Paladins are left unassigned
         for i = 5, #paladins do
             local pExtra = paladins[i]
-            local bIndex = (i % 2 == 1) and 5 or 6
+            local bIndex = (i == 5) and 6 or 0
             for _, cls in ipairs(Buffadin.CLASSES) do
                 self:SetGreater(pExtra, cls.id, bIndex, true)
             end
+        end
+    end
+
+    -- Salvation: the last Paladin casts Mass Salvation on every class except pets.
+    -- Tanks are excluded per player and get it Revoked if Mass Salvation hits them.
+    local salvPally = paladins[#paladins]
+    for _, pallyName in ipairs(paladins) do
+        for _, cls in ipairs(Buffadin.CLASSES) do
+            self:SetSalvation(pallyName, cls.id, pallyName == salvPally and cls.id ~= 10, true)
         end
     end
 
@@ -369,7 +516,15 @@ function Buffadin.Assignments:Report(channel)
             auraText = " [Aura: " .. Buffadin.AURAS[auraIndex].name:gsub(" Aura", "") .. "]"
         end
 
-        local reportLine = " - " .. pallyName .. auraText .. ": " .. ((#parts > 0) and table.concat(parts, ", ") or "No blessings")
+        local salvClasses = {}
+        for _, cls in ipairs(Buffadin.CLASSES) do
+            if self:GetSalvation(pallyName, cls.id) then
+                table.insert(salvClasses, cls.name:sub(1, 3):upper())
+            end
+        end
+        local salvText = (#salvClasses > 0) and (" [Salv: " .. table.concat(salvClasses, ", ") .. "]") or ""
+
+        local reportLine = " - " .. pallyName .. auraText .. ": " .. ((#parts > 0) and table.concat(parts, ", ") or "No blessings") .. salvText
         SendChatMessage(reportLine, channel)
     end
 end
@@ -393,16 +548,38 @@ function Buffadin.Assignments:BroadcastAura(pallyName, auraIndex)
     Buffadin:SendComm(Buffadin.COMM_PREFIX, msg)
 end
 
+function Buffadin.Assignments:BroadcastSalvation(pallyName, classId, enabled)
+    local msg = string.format("SALV;%s;%d;%d", pallyName, classId, enabled and 1 or 0)
+    Buffadin:SendComm(Buffadin.COMM_PREFIX, msg)
+end
+
+function Buffadin.Assignments:BroadcastSalvationExcluded(unitName, excluded)
+    local msg = string.format("NOSALV;%s;%d", unitName, excluded and 1 or 0)
+    Buffadin:SendComm(Buffadin.COMM_PREFIX, msg)
+end
+
 function Buffadin.Assignments:BroadcastFullSync()
     for _, pallyName in ipairs(Buffadin.Roster.sortedPaladins) do
         local assignments = {}
+        local salvClasses = {}
         for _, cls in ipairs(Buffadin.CLASSES) do
             local gIndex = self:GetGreater(pallyName, cls.id)
             table.insert(assignments, string.format("%d=%d", cls.id, gIndex))
+            if self:GetSalvation(pallyName, cls.id) then
+                table.insert(salvClasses, tostring(cls.id))
+            end
         end
         local auraIndex = self:GetAura(pallyName)
         local msg = string.format("SYNC;%s;%s;%d", pallyName, table.concat(assignments, ","), auraIndex)
         Buffadin:SendComm(Buffadin.COMM_PREFIX, msg)
+
+        -- Sent after SYNC so it wins over any legacy Salvation index an older client might have sent
+        local salvMsg = string.format("SALVSYNC;%s;%s", pallyName, table.concat(salvClasses, ","))
+        Buffadin:SendComm(Buffadin.COMM_PREFIX, salvMsg)
+    end
+
+    for unitName, excluded in pairs(self.salvExclude) do
+        self:BroadcastSalvationExcluded(unitName, excluded)
     end
 end
 
@@ -462,6 +639,34 @@ function Buffadin.Assignments:OnMessageReceived(prefix, message, channel, sender
                 if auraIndex then
                     self:SetAura(pallyName, auraIndex, true)
                 end
+            end
+        elseif cmd == "SALV" then
+            local pallyName = parts[2]
+            local classId = tonumber(parts[3])
+            local enabled = tonumber(parts[4])
+            if pallyName and classId and enabled then
+                self:SetSalvation(pallyName, classId, enabled == 1, true)
+            end
+        elseif cmd == "SALVSYNC" then
+            local pallyName = parts[2]
+            local classList = parts[3] or ""
+            if pallyName then
+                local enabledClasses = {}
+                for cid in string.gmatch(classList, "([^,]+)") do
+                    cid = tonumber(cid)
+                    if cid then
+                        enabledClasses[cid] = true
+                    end
+                end
+                for _, cls in ipairs(Buffadin.CLASSES) do
+                    self:SetSalvation(pallyName, cls.id, enabledClasses[cls.id] == true, true)
+                end
+            end
+        elseif cmd == "NOSALV" then
+            local unitName = parts[2]
+            local excluded = tonumber(parts[3])
+            if unitName and excluded then
+                self:SetSalvationExcluded(unitName, excluded == 1, true)
             end
         elseif cmd == "FREEASSIGN" then
             local val = tonumber(parts[2]) == 1

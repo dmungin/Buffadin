@@ -1,7 +1,7 @@
 local addonName, Buffadin = ...
 _G["Buffadin"] = Buffadin
 
-Buffadin.version = "0.2.3"
+Buffadin.version = "0.3.0"
 Buffadin.addonName = addonName
 Buffadin.combatQueue = {}
 
@@ -62,6 +62,9 @@ function Buffadin:GetSpellName(spellID)
     end
     if self.RIGHTEOUS_FURY and self.RIGHTEOUS_FURY.spellId == spellID then
         return self.RIGHTEOUS_FURY.name
+    end
+    for _, spell in ipairs({ self.SALVATION, self.MASS_SALVATION, self.REVOKE }) do
+        if spell.spellId == spellID then return spell.name end
     end
     for _, s in pairs(self.SEALS or {}) do
         if s.spellId == spellID then return s.name end

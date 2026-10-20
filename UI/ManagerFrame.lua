@@ -126,13 +126,22 @@ function Frame:GetOrCreateCell(pallyIdx, classId)
     local btn = CreateFrame("Button", nil, self.content, "BackdropTemplate")
     btn:SetSize(52, 28)
     Buffadin.Theme:ApplyCardBackdrop(btn, 0.80, 0.60)
-    btn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    btn:RegisterForClicks("LeftButtonUp", "RightButtonUp", "MiddleButtonUp")
 
     local icon = btn:CreateTexture(nil, "ARTWORK")
     icon:SetSize(22, 22)
     icon:SetPoint("CENTER", 0, 0)
     icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
     btn.icon = icon
+
+    -- Salvation badge (bottom-right), shown when this Paladin casts Mass Salvation on the class
+    local salvIcon = btn:CreateTexture(nil, "OVERLAY")
+    salvIcon:SetSize(12, 12)
+    salvIcon:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -3, 3)
+    salvIcon:SetTexture(Buffadin.MASS_SALVATION.icon)
+    salvIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    salvIcon:Hide()
+    btn.salvIcon = salvIcon
 
     btn:SetScript("OnClick", function(self, mouseBtn)
         local canEdit = Buffadin.Roster:CanEditAssignments()
@@ -144,6 +153,11 @@ function Frame:GetOrCreateCell(pallyIdx, classId)
         local pallyName = self.pallyName
         local cid = self.classId
         if not pallyName or not cid then return end
+
+        if mouseBtn == "MiddleButton" or IsControlKeyDown() then
+            Buffadin.Assignments:ToggleSalvation(pallyName, cid)
+            return
+        end
 
         local step = (mouseBtn == "RightButton") and -1 or 1
         Buffadin.Assignments:CycleGreater(pallyName, cid, step)
@@ -177,6 +191,11 @@ function Frame:GetOrCreateCell(pallyIdx, classId)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:AddLine((cls and cls.name or "Class") .. " - " .. pallyName, 1, 1, 1)
         GameTooltip:AddLine("Assigned: " .. (gInfo and gInfo.name or "None"), 0.9, 0.8, 0.4)
+        if Buffadin.Assignments:GetSalvation(pallyName, cid) then
+            GameTooltip:AddLine("Salvation: |cff00ff00Mass Salvation|r", 0.9, 0.8, 0.4)
+        else
+            GameTooltip:AddLine("Salvation: |cffaaaaaaNone|r", 0.9, 0.8, 0.4)
+        end
 
         if not Buffadin.Roster:CanEditAssignments() then
             GameTooltip:AddLine(" ")
@@ -185,6 +204,7 @@ function Frame:GetOrCreateCell(pallyIdx, classId)
             GameTooltip:AddLine(" ")
             GameTooltip:AddLine("|cff00ff00Left-Click / Scroll Up:|r Next Blessing", 0.7, 0.7, 0.7)
             GameTooltip:AddLine("|cff00ff00Right-Click / Scroll Down:|r Previous Blessing", 0.7, 0.7, 0.7)
+            GameTooltip:AddLine("|cff00ff00Middle-Click / Ctrl-Click:|r Toggle Salvation", 0.7, 0.7, 0.7)
         end
         GameTooltip:Show()
     end)
@@ -422,6 +442,12 @@ function Frame:UpdateGrid()
                 cell.icon:SetDesaturated(true)
                 Buffadin.Theme:SetBorderStatus(cell, "Disabled")
             end
+
+            local hasSalv = Buffadin.Assignments:GetSalvation(pallyName, cls.id)
+            cell.salvIcon:SetShown(hasSalv)
+            if hasSalv and not (gInfo and gInfo.spellId > 0) then
+                Buffadin.Theme:SetBorderStatus(cell, "Good")
+            end
         end
 
         -- Aura Cell
@@ -624,7 +650,7 @@ function Frame:UpdateOverridesDrawer()
             -- Player name text
             local nameText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
             nameText:SetPoint("LEFT", 6, 0)
-            nameText:SetWidth(125)
+            nameText:SetWidth(110)
             nameText:SetJustifyH("LEFT")
             nameText:SetWordWrap(false)
             row.nameText = nameText
@@ -678,7 +704,7 @@ function Frame:UpdateOverridesDrawer()
                     GameTooltip:AddLine("Default: |cffaaaaaa" .. (gConfig and gConfig.name or "None") .. "|r", 1, 1, 1)
                 end
                 if self.isTank then
-                    GameTooltip:AddLine("|cffffaa00[Tank]:|r Override to Might/Sanctuary to avoid Salvation!", 1, 0.8, 0)
+                    GameTooltip:AddLine("|cffffaa00[Tank]:|r Excluded from Salvation by default (see the Salvation toggle)", 1, 0.8, 0, true)
                 end
                 GameTooltip:AddLine(" ")
                 GameTooltip:AddLine("|cff00ff00Left-Click / Scroll Up:|r Next Override", 0.7, 0.7, 0.7)
@@ -689,6 +715,54 @@ function Frame:UpdateOverridesDrawer()
             cell:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
             row.cell = cell
+
+            -- Salvation exclusion toggle (left of the override cell)
+            local salvCell = CreateFrame("Button", nil, row, "BackdropTemplate")
+            salvCell:SetSize(24, 24)
+            salvCell:SetPoint("RIGHT", cell, "LEFT", -4, 0)
+            Buffadin.Theme:ApplyCardBackdrop(salvCell, 0.80, 0.60)
+            salvCell:RegisterForClicks("LeftButtonUp")
+
+            local salvIcon = salvCell:CreateTexture(nil, "ARTWORK")
+            salvIcon:SetSize(18, 18)
+            salvIcon:SetPoint("CENTER", 0, 0)
+            salvIcon:SetTexture(Buffadin.SALVATION.icon)
+            salvIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+            salvCell.icon = salvIcon
+
+            local salvCross = salvCell:CreateTexture(nil, "OVERLAY")
+            salvCross:SetSize(16, 16)
+            salvCross:SetPoint("CENTER", 0, 0)
+            salvCross:SetTexture("Interface\\Buttons\\UI-GroupLoot-Pass-Up")
+            salvCross:Hide()
+            salvCell.cross = salvCross
+
+            salvCell:SetScript("OnClick", function(self)
+                if not self.unitName then return end
+                Buffadin.Assignments:ToggleSalvationExcluded(self.unitName, self.isTank)
+                Frame:UpdateOverridesDrawer()
+            end)
+
+            salvCell:SetScript("OnEnter", function(self)
+                if not self.unitName then return end
+                local excluded = Buffadin.Assignments:IsSalvationExcluded(self.unitName, self.isTank)
+                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                GameTooltip:AddLine(self.unitName .. " - Salvation", 0.95, 0.82, 0.3)
+                if excluded then
+                    GameTooltip:AddLine("|cffff4444Excluded|r: Revoke Salvation if Mass Salvation lands on them", 1, 1, 1, true)
+                else
+                    GameTooltip:AddLine("|cff00ff00Included|r: receives Salvation", 1, 1, 1)
+                end
+                if self.isTank then
+                    GameTooltip:AddLine("|cffffaa00[Tank]:|r Excluded by default", 1, 0.8, 0)
+                end
+                GameTooltip:AddLine(" ")
+                GameTooltip:AddLine("|cff00ff00Left-Click:|r Toggle Salvation exclusion", 0.7, 0.7, 0.7)
+                GameTooltip:Show()
+            end)
+            salvCell:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+            row.salvCell = salvCell
             self.drawer.rows[i] = row
         end
 
@@ -707,6 +781,13 @@ function Frame:UpdateOverridesDrawer()
         row.cell.classId = cid
         row.cell.unitName = unitInfo.name
         row.cell.isTank = unitInfo.isTank
+
+        local salvExcluded = Buffadin.Assignments:IsSalvationExcluded(unitInfo.name, unitInfo.isTank)
+        row.salvCell.unitName = unitInfo.name
+        row.salvCell.isTank = unitInfo.isTank
+        row.salvCell.cross:SetShown(salvExcluded)
+        row.salvCell.icon:SetDesaturated(salvExcluded)
+        Buffadin.Theme:SetBorderStatus(row.salvCell, salvExcluded and "Disabled" or "Good")
 
         local nIndex = Buffadin.Assignments:GetNormal(pallyName, cid, unitInfo.name)
         if nIndex and nIndex > 0 and Buffadin.NORMAL_BLESSINGS[nIndex] then

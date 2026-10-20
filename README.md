@@ -26,8 +26,13 @@
 
 <img width="775" height="277" alt="image" src="https://github.com/user-attachments/assets/9d0d663e-f61a-4c2d-a4ca-5e50b9e82148" />
 
-- Priority-based one-click buffing button that dynamically calculates and targets the next player needing a blessing (missing self-aura, class with the most missing buffs, expiring buffs, or custom single-target overrides).
+- Priority-based one-click buffing button that dynamically calculates and targets the next player needing a blessing (missing self-aura, Revoke on tanks hit by Mass Salvation, class with the most missing buffs, custom single-target overrides, missing Salvation, or expiring buffs).
 - **Out of Combat Only**: Due to World of Warcraft's combat lockdown restrictions on secure action buttons, smart auto-targeting is strictly out of combat. During combat, the button is automatically disabled and greyed out to prevent mis-targeting. As soon as combat drops, the button immediately reactivates with the next optimal target.
+
+**Salvation & Revoke**
+- On WoW: Forever, Salvation and Mass Salvation are no longer Blessings and stack with them. Buffadin tracks them as a separate layer: middle-click (or Ctrl-click) a cell in the assignment matrix to assign Mass Salvation for that class.
+- Middle-click a class button on the bar to cast Mass Salvation. Right-click a player in the class flyout to cast single-target Salvation.
+- Tanks are excluded from Salvation by default (toggle per player in the flyout or the Class Overrides drawer). When Mass Salvation lands on an excluded player, the class button shows **R** and right-clicking that player (or the Auto-Buff button) casts **Revoke**.
 
 **Flexible Permission Control**
 - **Party & Solo**: Defaults to Free Assign mode so anyone can configure their own buffs without requiring party lead.

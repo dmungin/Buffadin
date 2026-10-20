@@ -29,7 +29,7 @@ function Popups:GetOrCreateButton(index)
     end
 
     local btn = CreateFrame("Button", "Buffadin_PopupBtn" .. index, self, "SecureActionButtonTemplate, BackdropTemplate")
-    btn:SetSize(170, 26)
+    btn:SetSize(190, 26)
     Buffadin.Theme:ApplyCardBackdrop(btn, 0.80, 0.60)
     btn:RegisterForClicks("AnyUp", "AnyDown")
 
@@ -51,7 +51,7 @@ function Popups:GetOrCreateButton(index)
 
     -- Expiration timer
     local timerText = btn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    timerText:SetPoint("RIGHT", -26, 0)
+    timerText:SetPoint("RIGHT", -48, 0)
     timerText:SetJustifyH("RIGHT")
     btn.timerText = timerText
 
@@ -116,7 +116,7 @@ function Popups:GetOrCreateButton(index)
             GameTooltip:AddLine("Current: |cffaaaaaaDefault (" .. (gConfig and gConfig.name or "None") .. ")|r", 1, 1, 1)
         end
         if self.isTank then
-            GameTooltip:AddLine("|cffffaa00[Tank]:|r Override to Might/Sanctuary to avoid Salvation!", 1, 0.8, 0)
+            GameTooltip:AddLine("|cffffaa00[Tank]:|r Excluded from Salvation by default (see the Salvation toggle)", 1, 0.8, 0, true)
         end
         GameTooltip:AddLine(" ")
         GameTooltip:AddLine("|cff00ff00Left-Click / Scroll Up:|r Cycle Next Override", 0.7, 0.7, 0.7)
@@ -131,6 +131,61 @@ function Popups:GetOrCreateButton(index)
     end)
 
     btn.overrideBtn = overrideBtn
+
+    -- Salvation exclusion toggle (tanks are excluded by default and get Salvation Revoked)
+    local salvBtn = CreateFrame("Button", nil, btn, "BackdropTemplate")
+    salvBtn:SetSize(20, 20)
+    salvBtn:SetPoint("RIGHT", overrideBtn, "LEFT", -2, 0)
+    Buffadin.Theme:ApplyCardBackdrop(salvBtn, 0.90, 0.80)
+    salvBtn:RegisterForClicks("LeftButtonUp")
+
+    local salvIcon = salvBtn:CreateTexture(nil, "ARTWORK")
+    salvIcon:SetSize(16, 16)
+    salvIcon:SetPoint("CENTER", 0, 0)
+    salvIcon:SetTexture(Buffadin.SALVATION.icon)
+    salvIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    salvBtn.icon = salvIcon
+
+    local salvCross = salvBtn:CreateTexture(nil, "OVERLAY")
+    salvCross:SetSize(14, 14)
+    salvCross:SetPoint("CENTER", 0, 0)
+    salvCross:SetTexture("Interface\\Buttons\\UI-GroupLoot-Pass-Up")
+    salvCross:Hide()
+    salvBtn.cross = salvCross
+
+    salvBtn:SetScript("OnClick", function(self)
+        if not self.unitName then return end
+        Buffadin.Assignments:ToggleSalvationExcluded(self.unitName, self.isTank)
+        if Popups.currentClassId and Popups.currentAnchor then
+            Popups:ShowForClass(Popups.currentClassId, Popups.currentAnchor)
+        end
+    end)
+
+    salvBtn:SetScript("OnEnter", function(self)
+        Popups:CancelHide()
+        if not self.unitName then return end
+        local excluded = Buffadin.Assignments:IsSalvationExcluded(self.unitName, self.isTank)
+        GameTooltip:SetOwner(self, GetRowTooltipAnchor())
+        GameTooltip:AddLine(self.unitName .. " - Salvation", 0.95, 0.82, 0.3)
+        if excluded then
+            GameTooltip:AddLine("|cffff4444Excluded|r: Revoke Salvation if Mass Salvation lands on them", 1, 1, 1, true)
+        else
+            GameTooltip:AddLine("|cff00ff00Included|r: receives Salvation", 1, 1, 1)
+        end
+        if self.isTank then
+            GameTooltip:AddLine("|cffffaa00[Tank]:|r Excluded by default", 1, 0.8, 0)
+        end
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("|cff00ff00Left-Click:|r Toggle Salvation exclusion", 0.7, 0.7, 0.7)
+        GameTooltip:Show()
+    end)
+
+    salvBtn:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+        Popups:ScheduleHide()
+    end)
+
+    btn.salvBtn = salvBtn
 
     btn:SetScript("OnEnter", function(self)
         Popups:CancelHide()
@@ -151,9 +206,17 @@ function Popups:GetOrCreateButton(index)
                 else
                     GameTooltip:AddLine("Status: |cffff2222Missing|r")
                 end
+                if uStatus.salvExcluded and uStatus.hasSalv then
+                    GameTooltip:AddLine("Salvation: |cffffaa00Excluded but active (Revoke)|r")
+                elseif uStatus.salvExcluded then
+                    GameTooltip:AddLine("Salvation: |cffaaaaaaExcluded|r")
+                elseif uStatus.hasSalv then
+                    GameTooltip:AddLine("Salvation: |cff00ff00Active|r (" .. Buffadin.Theme:FormatTime(uStatus.salvExpiration) .. ")")
+                end
             end
             GameTooltip:AddLine(" ")
             GameTooltip:AddLine("|cff00ff00Left-Click:|r Cast Blessing on " .. self.unitInfo.name, 0.7, 0.7, 0.7)
+            GameTooltip:AddLine("|cff00ff00Right-Click:|r Cast Salvation (or Revoke if excluded)", 0.7, 0.7, 0.7)
             GameTooltip:AddLine("|cffaaaaaaUse the icon on the right to set custom overrides|r", 0.6, 0.6, 0.6)
             GameTooltip:Show()
         end
@@ -188,7 +251,7 @@ function Popups:ShowForClass(classId, anchorFrame)
     local btnHeight = 28
     local padding = 6
     local totalHeight = (#units * btnHeight) + (padding * 2)
-    self:SetSize(182, totalHeight)
+    self:SetSize(202, totalHeight)
 
     local db = Buffadin.db.profile
     local isVertical = (db.orientation == "VERTICAL")
@@ -262,6 +325,21 @@ function Popups:ShowForClass(classId, anchorFrame)
         end
         btn.buffIcon:SetTexture(icon)
 
+        -- Configure the Salvation toggle
+        local salvExcluded = Buffadin.Assignments:IsSalvationExcluded(unitInfo.name, unitInfo.isTank)
+        local salvAssigned = Buffadin.Assignments:GetSalvation(playerName, classId)
+        btn.salvBtn.unitName = unitInfo.name
+        btn.salvBtn.isTank = unitInfo.isTank
+        btn.salvBtn.cross:SetShown(salvExcluded)
+        btn.salvBtn.icon:SetDesaturated(salvExcluded or not uStatus.hasSalv)
+        if salvExcluded then
+            Buffadin.Theme:SetBorderStatus(btn.salvBtn, uStatus.hasSalv and "All" or "Disabled")
+        elseif uStatus.hasSalv then
+            Buffadin.Theme:SetBorderStatus(btn.salvBtn, "Good")
+        else
+            Buffadin.Theme:SetBorderStatus(btn.salvBtn, salvAssigned and "Some" or "Disabled")
+        end
+
         local isDead = Buffadin:IsUnitDead(unitInfo.unitId)
 
         -- Timer
@@ -284,6 +362,24 @@ function Popups:ShowForClass(classId, anchorFrame)
                 btn:SetAttribute("type1", nil)
                 btn:SetAttribute("spell1", nil)
                 btn:SetAttribute("unit1", nil)
+            end
+
+            -- Right-click: Revoke Salvation from an excluded player, otherwise single-target Salvation
+            local rightSpellId = nil
+            if salvExcluded then
+                rightSpellId = uStatus.hasSalv and Buffadin.REVOKE.spellId or nil
+            else
+                rightSpellId = Buffadin.SALVATION.spellId
+            end
+            local rightSpellName = (rightSpellId and Buffadin:IsSpellKnown(rightSpellId)) and Buffadin:GetSpellName(rightSpellId) or ""
+            if rightSpellName ~= "" and not isDead then
+                btn:SetAttribute("type2", isMock and nil or "spell")
+                btn:SetAttribute("spell2", rightSpellName)
+                btn:SetAttribute("unit2", unitInfo.unitId)
+            else
+                btn:SetAttribute("type2", nil)
+                btn:SetAttribute("spell2", nil)
+                btn:SetAttribute("unit2", nil)
             end
         end
 

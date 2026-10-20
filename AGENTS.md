@@ -68,6 +68,10 @@ Keyed by paladin name, then class id (1–10 from `Buffadin.CLASSES`; 10 = pets)
 - `data[pally][classId] = greaterIndex` (index into `GREATER_BLESSINGS`, 0 = none)
 - `normalData[pally][classId][unitName] = normalIndex` (single-target override; into `NORMAL_BLESSINGS`)
 - `auraData[pally] = auraIndex` (into `AURAS`)
+- `salvData[pally][classId] = true` (Mass Salvation on that class; Salvation is no longer a Blessing on Forever)
+- `salvExclude[unitName] = true|false` (players who should not keep Salvation; `nil` means "excluded if tank")
+
+Blessing index 4 (the old Salvation blessing) is retired: the tables have a hole there so Light (5) and Sanctuary (6) keep their indices for older clients. Index 4 received over the network or found in saved data is converted to `salvData` (`SetGreater`, `MigrateLegacySalvation`).
 
 Paladin names go through `Assignments:NormalizePaladinName()` so the local player is always the bare `UnitName("player")`; remote players may be `Name-Realm`. Always use the getters/setters rather than indexing the tables directly — they call `EnsurePaladin`, clamp ranges, check permissions, persist, broadcast, and fire `OnAssignmentsChanged`.
 
@@ -84,6 +88,9 @@ Addon messages on prefix `BUFFADIN` (the legacy `PLPWR` prefix is registered but
 | `AURA;pally;idx` | Aura assignment |
 | `SYNC;pally;cid=idx,cid=idx,...;auraIdx` | Full state for one paladin |
 | `FREEASSIGN;0\|1` | Toggle raid Free Assign mode |
+| `SALV;pally;classId;0\|1` | Mass Salvation on a class (not a Blessing; stacks with blessings) |
+| `SALVSYNC;pally;cid,cid,...` | Full Salvation state for one paladin (sent right after `SYNC`) |
+| `NOSALV;unitName;0\|1` | Exclude a player from Salvation (tanks are excluded by default) |
 
 Changing a message format breaks compatibility with other group members running older versions — add new commands instead of changing existing ones.
 
