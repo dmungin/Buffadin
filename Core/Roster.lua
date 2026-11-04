@@ -104,8 +104,6 @@ function Buffadin.Roster:Update()
                     if pallyInfo.isPlayer then
                         pallyInfo.hasKings = Buffadin:IsSpellKnown(20217) or Buffadin:IsSpellKnown(25898)
                         pallyInfo.hasSanctuary = Buffadin:IsSpellKnown(20911) or Buffadin:IsSpellKnown(25899)
-                        pallyInfo.hasSalvation = Buffadin:IsSpellKnown(Buffadin.SALVATION.spellId) or Buffadin:IsSpellKnown(Buffadin.MASS_SALVATION.spellId)
-                        pallyInfo.hasLight = Buffadin:IsSpellKnown(19977) or Buffadin:IsSpellKnown(25890)
                         pallyInfo.hasMight = Buffadin:IsSpellKnown(19740) or Buffadin:IsSpellKnown(25782)
                         pallyInfo.hasWisdom = Buffadin:IsSpellKnown(19742) or Buffadin:IsSpellKnown(25894)
                     else
@@ -114,15 +112,11 @@ function Buffadin.Roster:Update()
                         if prev then
                             pallyInfo.hasKings = prev.hasKings
                             pallyInfo.hasSanctuary = prev.hasSanctuary
-                            pallyInfo.hasSalvation = prev.hasSalvation
-                            pallyInfo.hasLight = prev.hasLight
                             pallyInfo.hasMight = prev.hasMight
                             pallyInfo.hasWisdom = prev.hasWisdom
                         else
                             pallyInfo.hasKings = true
                             pallyInfo.hasSanctuary = true
-                            pallyInfo.hasSalvation = true
-                            pallyInfo.hasLight = true
                             pallyInfo.hasMight = true
                             pallyInfo.hasWisdom = true
                         end

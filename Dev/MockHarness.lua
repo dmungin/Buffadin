@@ -9,7 +9,6 @@ Mock.simulatedCombat = false
 Mock.mockUnits = {}
 Mock.mockUnitList = {}
 Mock.buffStates = {} -- [unitId] = { hasBuff = bool, spellId = number, spellName = string, isGreater = bool, expires = number, duration = number, buffs = table }
-Mock.salvStates = {} -- [unitId] = { expires = number, duration = number } (Salvation / Mass Salvation)
 Mock.eventLog = {}   -- array of { timestamp, category, spell, target, details, formatted }
 Mock.hasAura = true
 Mock.hasRighteousFury = false
@@ -201,14 +200,6 @@ function Mock:GetUnitAura(unit, targetSpellID, targetSpellName)
         end
     end
 
-    if self:IsSalvationSpell(targetSpellID, targetSpellName) then
-        local salv = self.salvStates and self.salvStates[unit]
-        if salv and (salv.expires == 0 or salv.expires > GetTime()) then
-            return true, salv.expires, salv.duration
-        end
-        return false, 0, 0
-    end
-
     local state = self.buffStates and self.buffStates[unit]
     if not state then
         return false, 0, 0
@@ -282,15 +273,6 @@ function Mock:IsSealSpell(spellId, spellName)
     return false
 end
 
-function Mock:IsSalvationSpell(spellId, spellName)
-    for _, spell in ipairs({ Buffadin.SALVATION, Buffadin.MASS_SALVATION }) do
-        if (spellId and spellId > 0 and spell.spellId == spellId) or (spellName and spellName ~= "" and spell.name == spellName) then
-            return true
-        end
-    end
-    return false
-end
-
 function Mock:IsGreaterBlessing(spellName)
     if not spellName or spellName == "" then return false end
     if spellName:find("^Greater Blessing") or spellName:find("^Große[rs] Segen") or spellName:find("^Bénédiction supérieure") then
@@ -317,9 +299,6 @@ function Mock:FindSpellIdByName(spellName)
     end
     if Buffadin.RIGHTEOUS_FURY and Buffadin.RIGHTEOUS_FURY.name == spellName then
         return Buffadin.RIGHTEOUS_FURY.spellId
-    end
-    for _, spell in ipairs({ Buffadin.SALVATION, Buffadin.MASS_SALVATION, Buffadin.REVOKE }) do
-        if spell.name == spellName then return spell.spellId end
     end
     return 0
 end
@@ -374,31 +353,8 @@ function Mock:ClearUnitBuff(unitId)
     end
 end
 
-function Mock:SetUnitSalvation(unitId, duration)
-    duration = duration or Buffadin.DURATION_SALVATION
-    self.salvStates[unitId] = { expires = GetTime() + duration, duration = duration }
-end
-
-function Mock:ClearUnitSalvation(unitId)
-    self.salvStates[unitId] = nil
-end
-
--- Mass Salvation hits every member of the class, including excluded tanks (who then need Revoke)
-function Mock:ApplyAssignedSalvation(duration)
-    local pName = UnitName("player") or "Player"
-    local count = 0
-    for _, u in pairs(Buffadin.Roster.units) do
-        if Buffadin.Assignments:GetSalvation(pName, u.classId) then
-            self:SetUnitSalvation(u.unitId, duration)
-            count = count + 1
-        end
-    end
-    return count
-end
-
 function Mock:InitializeBuffStates()
     self.buffStates = {}
-    self.salvStates = {}
     local pName = UnitName("player") or "Player"
 
     for _, u in pairs(Buffadin.Roster.units) do
@@ -424,7 +380,6 @@ function Mock:InitializeBuffStates()
             self:ClearUnitBuff(u.unitId)
         end
     end
-    self:ApplyAssignedSalvation()
 
     self.hasAura = true
     self.hasRighteousFury = false
@@ -516,38 +471,12 @@ function Mock:PerformSimulatedCast(spellName, unit, category)
         return
     end
 
-    local clsConfig = Buffadin.CLASS_BY_TOKEN[classToken]
-
-    if spellName == Buffadin.REVOKE.name then
-        local hadSalv = self.salvStates[unit] ~= nil
-        self:ClearUnitSalvation(unit)
-        self:LogEvent(category or "NORMAL", spellName, name .. (isTank and " [Tank]" or ""), hadSalv and "Salvation removed" or "No Salvation to remove")
-    elseif spellName == Buffadin.MASS_SALVATION.name then
-        local cid = clsConfig and clsConfig.id or 1
-        local classUnits = Buffadin.Roster.classes[cid] or {}
-        for _, u in ipairs(classUnits) do
-            self:SetUnitSalvation(u.unitId)
-        end
-        self:LogEvent(category or "CLASS", spellName, clsConfig and clsConfig.name or classToken, string.format("%d player%s", #classUnits, #classUnits == 1 and "" or "s"))
-    elseif spellName == Buffadin.SALVATION.name then
-        self:SetUnitSalvation(unit)
-        self:LogEvent(category or "NORMAL", spellName, name .. (isTank and " [Tank]" or ""), "Single Salvation")
-    end
-
-    if self:IsSalvationSpell(nil, spellName) or spellName == Buffadin.REVOKE.name then
-        Buffadin.BuffScanner:Scan()
-        Buffadin.BlessingsBar:RefreshDisplay()
-        if Buffadin.PlayerPopups and Buffadin.PlayerPopups:IsShown() and Buffadin.PlayerPopups.currentClassId then
-            Buffadin.PlayerPopups:ShowForClass(Buffadin.PlayerPopups.currentClassId, Buffadin.PlayerPopups.currentAnchor)
-        end
-        return
-    end
-
     local isGreater = self:IsGreaterBlessing(spellName)
     local spellId = self:FindSpellIdByName(spellName)
 
     if isGreater then
         -- Greater Blessing: hits ALL group members of this class in the roster
+        local clsConfig = Buffadin.CLASS_BY_TOKEN[classToken]
         local cid = clsConfig and clsConfig.id or 1
         local classUnits = Buffadin.Roster.classes[cid] or {}
         local buffedNames = {}
@@ -634,10 +563,6 @@ function Mock:HookInteractiveButtons()
                         unit = cUnits and cUnits[1] and cUnits[1].unitId
                     end
                     Mock:PerformSimulatedCast(spell, unit, "NORMAL")
-                elseif button == "MiddleButton" then
-                    local spell = bSelf:GetAttribute("spell3")
-                    local unit = bSelf:GetAttribute("unit3")
-                    Mock:PerformSimulatedCast(spell, unit, "CLASS")
                 end
             end)
         end
@@ -684,9 +609,8 @@ function Mock:HookInteractiveButtons()
         if Buffadin.PlayerPopups.buttons then
             for _, btn in ipairs(Buffadin.PlayerPopups.buttons) do
                 self:HookButton(btn, function(bSelf, button)
-                    local suffix = (button == "RightButton") and "2" or "1"
-                    local spell = bSelf:GetAttribute("spell" .. suffix)
-                    local unit = bSelf:GetAttribute("unit" .. suffix)
+                    local spell = bSelf:GetAttribute("spell1")
+                    local unit = bSelf:GetAttribute("unit1")
                     Mock:PerformSimulatedCast(spell, unit, "POPUP")
                 end)
             end
@@ -696,9 +620,8 @@ function Mock:HookInteractiveButtons()
             Buffadin.PlayerPopups.GetOrCreateButton = function(pSelf, index)
                 local btn = Mock.origGetOrCreateButton(pSelf, index)
                 Mock:HookButton(btn, function(bSelf, button)
-                    local suffix = (button == "RightButton") and "2" or "1"
-                    local spell = bSelf:GetAttribute("spell" .. suffix)
-                    local unit = bSelf:GetAttribute("unit" .. suffix)
+                    local spell = bSelf:GetAttribute("spell1")
+                    local unit = bSelf:GetAttribute("unit1")
                     Mock:PerformSimulatedCast(spell, unit, "POPUP")
                 end)
                 return btn
@@ -795,11 +718,9 @@ function Mock:BuffAll(duration)
         end
     end
 
-    local salvCount = self:ApplyAssignedSalvation(duration)
-
     Buffadin.BuffScanner:Scan()
     Buffadin.BlessingsBar:RefreshDisplay()
-    self:LogEvent("SYSTEM", "Buff All", "All Members", string.format("Set %dm duration on %d units (+%d Salvation)", math.floor(duration / 60), count, salvCount))
+    self:LogEvent("SYSTEM", "Buff All", "All Members", string.format("Set %dm duration on %d units", math.floor(duration / 60), count))
     Buffadin:Print(string.format("Mock: Applied %d-minute buffs to %d members.", math.floor(duration / 60), count))
 end
 
@@ -890,7 +811,6 @@ function Mock:SimulateDeath(unitId)
     if u then
         u.isDead = true
         self:ClearUnitBuff(unitId)
-        self:ClearUnitSalvation(unitId)
         Buffadin.BuffScanner:Scan()
         Buffadin.BlessingsBar:RefreshDisplay()
         self:LogEvent("WARN", "Unit Died", u.name, "Unit marked dead")
@@ -930,21 +850,12 @@ function Mock:ApplyDefaultAssignments()
         Buffadin.Assignments:SetAura(p1, 1, true)       -- Devotion Aura
     end
 
-    -- P1 also casts Mass Salvation on Warriors and Mages (the Warrior tank is excluded and needs Revoke)
-    if p1 then
-        Buffadin.Assignments:SetSalvation(p1, 1, true, true)
-        Buffadin.Assignments:SetSalvation(p1, 7, true, true)
-    end
-
-    -- P2 (Uther): Kings and Mass Salvation on casters & DPS
+    -- P2 (Uther): Kings on casters & DPS
     if p2 then
         Buffadin.Assignments:SetGreater(p2, 1, 3, true) -- Warrior = Kings
         Buffadin.Assignments:SetGreater(p2, 7, 3, true) -- Mage = Kings
         Buffadin.Assignments:SetGreater(p2, 8, 3, true) -- Warlock = Kings
         Buffadin.Assignments:SetGreater(p2, 5, 3, true) -- Priest = Kings
-        for _, cid in ipairs({ 1, 7, 8, 5 }) do
-            Buffadin.Assignments:SetSalvation(p2, cid, true, true)
-        end
         Buffadin.Assignments:SetAura(p2, 2, true)       -- Retribution Aura
     end
 
@@ -956,9 +867,10 @@ function Mock:ApplyDefaultAssignments()
         Buffadin.Assignments:SetAura(p3, 3, true)       -- Concentration Aura
     end
 
-    -- P4 (Turalyon): Light
+    -- P4 (Turalyon): Sanctuary on tank classes
     if p4 then
-        Buffadin.Assignments:SetGreater(p4, 2, 5, true) -- Paladin = Light
+        Buffadin.Assignments:SetGreater(p4, 1, 6, true) -- Warrior = Sanctuary
+        Buffadin.Assignments:SetGreater(p4, 2, 6, true) -- Paladin = Sanctuary
         Buffadin.Assignments:SetAura(p4, 5, true)       -- Fire Resistance Aura
     end
 end
@@ -978,8 +890,6 @@ function Mock:Enable(preset)
         self.savedAssignments = CopyTable(Buffadin.Assignments.data)
         self.savedNormalAssignments = CopyTable(Buffadin.Assignments.normalData)
         self.savedAuraAssignments = CopyTable(Buffadin.Assignments.auraData)
-        self.savedSalvAssignments = CopyTable(Buffadin.Assignments.salvData)
-        self.savedSalvExclusions = CopyTable(Buffadin.Assignments.salvExclude)
     end
 
     -- 4. Run real production roster update
@@ -1009,26 +919,19 @@ function Mock:Disable()
     self.mockUnits = {}
     self.mockUnitList = {}
     self.buffStates = {}
-    self.salvStates = {}
 
     -- Restore real saved assignments
     if self.savedAssignments then
         Buffadin.Assignments.data = CopyTable(self.savedAssignments)
         Buffadin.Assignments.normalData = CopyTable(self.savedNormalAssignments or {})
         Buffadin.Assignments.auraData = CopyTable(self.savedAuraAssignments or {})
-        Buffadin.Assignments.salvData = CopyTable(self.savedSalvAssignments or {})
-        Buffadin.Assignments.salvExclude = CopyTable(self.savedSalvExclusions or {})
         self.savedAssignments = nil
         self.savedNormalAssignments = nil
         self.savedAuraAssignments = nil
-        self.savedSalvAssignments = nil
-        self.savedSalvExclusions = nil
         if Buffadin.db and Buffadin.db.profile then
             Buffadin.db.profile.assignments = Buffadin.Assignments.data
             Buffadin.db.profile.normalAssignments = Buffadin.Assignments.normalData
             Buffadin.db.profile.auraAssignments = Buffadin.Assignments.auraData
-            Buffadin.db.profile.salvAssignments = Buffadin.Assignments.salvData
-            Buffadin.db.profile.salvExclusions = Buffadin.Assignments.salvExclude
         end
     end
 
